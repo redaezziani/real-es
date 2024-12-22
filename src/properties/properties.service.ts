@@ -5,11 +5,13 @@ import { GetAllPropertyDto } from './dtos/get-all.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { GetByIdPropertyDto } from './dtos/get-by-id.dto';
 import { DeletePropertyDto } from './dtos/delete.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 @Injectable()
 export class PropertiesService {
   constructor(
     private prisma: PrismaService,
     private redisService: RedisService,
+    private cloudinaryService: CloudinaryService,
   ) {}
   async createProperty(createPropertyDto: CreatePropertyDto) {
     try {
@@ -95,5 +97,30 @@ export class PropertiesService {
     } catch (error) {
       throw new Error(error);
     }
+  }
+
+  async uploadPropertyImages(propertyId: string, files: Express.Multer.File[]) {
+    const property = await this.prisma.properties.findUnique({
+      where: { id: propertyId },
+    });
+
+    if (!property) {
+      throw new Error('Property not found');
+    }
+
+    const uploadResults = await Promise.all(
+      files.map((file) =>
+        this.cloudinaryService.uploadImage(file, 'properties'),
+      ),
+    );
+
+    const imageRecords = uploadResults.map((result) => ({
+      url: result.secure_url,
+      propertyId,
+    }));
+
+    return await this.prisma.propertiesImages.createMany({
+      data: imageRecords,
+    });
   }
 }
