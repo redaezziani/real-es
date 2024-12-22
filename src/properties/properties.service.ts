@@ -29,7 +29,6 @@ export class PropertiesService {
       const limit = parseInt(getAllDto.limit, 10) || 10;
       const filter = getAllDto.filter || '';
 
-      // Redis cache key
       const key = `properties:${JSON.stringify(getAllDto)}`;
       const cachedProperties = await this.redisService.get(key);
 
@@ -37,7 +36,6 @@ export class PropertiesService {
         return JSON.parse(cachedProperties);
       }
 
-      // Prisma query
       const properties = await this.prisma.properties.findMany({
         skip: (page - 1) * limit,
         take: limit,
@@ -47,9 +45,37 @@ export class PropertiesService {
             { description: { contains: filter, mode: 'insensitive' } },
           ],
         },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          currency: true,
+          location: true,
+          type: true,
+
+          images: {
+            select: {
+              url: true,
+            },
+          },
+          profile: {
+            select: {
+              id: true,
+              role: true,
+              image: true,
+              bio: true,
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
-      // Cache results in Redis
       await this.redisService.set(key, JSON.stringify(properties));
       await this.redisService.expire(key, 60);
 

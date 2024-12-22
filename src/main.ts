@@ -43,8 +43,14 @@ async function bootstrap() {
   app.enableVersioning({
     type: VersioningType.URI,
   });
+  // enable cors for all routes
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept',
+  });
 
   await app.startAllMicroservices();
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 8000);
 }
 bootstrap();
