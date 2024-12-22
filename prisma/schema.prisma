@@ -1,0 +1,124 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Users {
+    id                        String                     @id @default(uuid())
+    name                      String
+    email                     String                     @unique
+    password                  String
+    createdAt                 DateTime                   @default(now())
+    updatedAt                 DateTime                   @updatedAt
+    emailVerified             Boolean                    @default(false)
+    verificationToken         String?                    @unique
+    verificationTokenExpiry   DateTime?
+    passwordResetToken        String?                    @unique
+    passwordResetExpiry       DateTime?
+    emailVerificationRequests EmailVerificationRequest[]
+    passwordResetRequests     PasswordResetRequest[]
+    profile                   Profiles?
+}
+
+model EmailVerificationRequest {
+    id        Int      @id @default(autoincrement())
+    userId    String
+    token     String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+    used      Boolean  @default(false)
+    user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([token])
+}
+
+model PasswordResetRequest {
+    id        Int      @id @default(autoincrement())
+    userId    String
+    token     String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+    used      Boolean  @default(false)
+    user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([token])
+}
+
+enum roles {
+    ADMIN
+    USER
+}
+
+enum badge {
+    VERIFIED
+    UNVERIFIED
+}
+
+model Profiles {
+    id         String       @id @default(uuid())
+    bio        String?
+    phone      String?
+    image      String?
+    userId     String       @unique
+    role       roles        @default(USER)
+    user       Users        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    properties Properties[]
+    badge      badge        @default(UNVERIFIED)
+
+    @@index([userId])
+}
+
+enum status {
+    PENDING
+    APPROVED
+    REJECTED
+    SOLD
+}
+
+enum propertyType {
+    APARTMENT
+    HOUSE
+    LAND
+    COMMERCIAL
+}
+
+enum currency {
+    USD // United States Dollar
+    EUR // Euro
+    GBP // British Pound
+    DH // Moroccan Dirham
+}
+
+model Properties {
+    id          String             @id @default(uuid())
+    name        String
+    description String
+    price       Float
+    profileId   String
+    rate        Float
+    location    String
+    currency    currency
+    type        propertyType
+    status      status             @default(PENDING)
+    profile     Profiles           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+    images      PropertiesImages[]
+    createdAt   DateTime           @default(now())
+    updatedAt   DateTime           @updatedAt
+
+    @@index([profileId])
+}
+
+model PropertiesImages {
+    id         String     @id @default(uuid())
+    url        String
+    propertyId String
+    property   Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+    createdAt  DateTime   @default(now())
+    updatedAt  DateTime   @updatedAt
+
+    @@index([propertyId])
+}
