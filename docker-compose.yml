@@ -1,23 +1,16 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:latest
-    container_name: postgres_container_prisma
-    environment:
-      - POSTGRES_USER=admin 
-      - POSTGRES_PASSWORD=admin 
-      - POSTGRES_DB=prisma-relations  
+  redis:
+    image: redis:latest
+    container_name: redis-container
     ports:
-      - "5440:5432" 
+      - "6379:6379"
     volumes:
-      - postgres_data:/var/lib/postgresql/data  
-    networks:
-      - postgres_network
+      - redis-data:/data
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
-
-networks:
-  postgres_network:
-    driver: bridge
+  redis-data:
+    driver: local

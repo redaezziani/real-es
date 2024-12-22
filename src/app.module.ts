@@ -5,6 +5,8 @@ import { LoggerModule } from './shared/logger.module';
 import { PropertiesModule } from './properties/properties.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { AuthModule } from './auth/auth.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { AuthModule } from './auth/auth.module';
     PropertiesModule,
     ProfilesModule,
     AuthModule,
+    CloudinaryModule,
+    RedisModule,
   ],
   controllers: [],
   providers: [PrismaService],
