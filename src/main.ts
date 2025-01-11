@@ -1,19 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { RmqOptions, Transport } from '@nestjs/microservices';
+// import { RmqOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { VersioningType } from '@nestjs/common';
+import { VersioningType, ValidationPipe } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
+import { Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // add a prefix to all routes
   app.setGlobalPrefix('api');
-  // Connect to RabbitMQ
-  app.connectMicroservice<RmqOptions>({
+  app.connectMicroservice({
     transport: Transport.RMQ,
     options: {
-      urls: [`amqp://admin:adminpassword@localhost:5672`],
-      queue: 'user_queue',
+      urls: ['amqp://admin:adminpassword@localhost:5672'],
+      queue: 'crawler_queue',
       prefetchCount: 1,
       persistent: true,
       queueOptions: {
@@ -45,10 +46,19 @@ async function bootstrap() {
   });
   // enable cors for all routes
   app.enableCors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept',
+    origin: 'http://localhost:3000',
+    credentials: true, // Important for cookies
   });
+  app.use(cookieParser());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // Enable automatic transformation
+      transformOptions: {
+        enableImplicitConversion: true, // Enable implicit conversions
+      },
+    }),
+  );
 
   await app.startAllMicroservices();
   await app.listen(process.env.PORT ?? 8000);

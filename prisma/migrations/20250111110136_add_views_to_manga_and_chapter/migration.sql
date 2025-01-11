@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Chapter" ADD COLUMN     "views" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Manga" ADD COLUMN     "views" INTEGER NOT NULL DEFAULT 0;

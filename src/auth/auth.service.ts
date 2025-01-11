@@ -33,21 +33,42 @@ export class AuthService {
     await this.mailService.sendVerificationEmail(user.email, verificationToken);
 
     return {
-      message: 'Registration successful. Check your email for verification.',
+      message: 'تم التسجيل بنجاح. تحقق من بريدك الإلكتروني للتحقق من حسابك',
     };
   }
 
   async login(loginDto: LoginDto) {
     const user = await this.prisma.users.findUnique({
       where: { email: loginDto.email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        password: true,
+        profile: {
+          select: {
+            id: true,
+            image: true,
+          },
+        },
+      },
     });
 
     if (!user || !(await bcrypt.compare(loginDto.password, user.password))) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException(
+        'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+      );
     }
 
+    // set the jwt in the cookie and also return the user :name and :email and profile
+    const jwt = this.jwtService.sign({ sub: user.id });
     return {
-      accessToken: this.jwtService.sign({ sub: user.id, email: user.email }),
+      token: jwt,
+      user: {
+        name: user.name,
+        email: user.email,
+        profile: user.profile,
+      },
     };
   }
 
@@ -57,7 +78,7 @@ export class AuthService {
     });
 
     if (!user || new Date() > user.verificationTokenExpiry) {
-      throw new UnauthorizedException('Token expired or invalid');
+      throw new UnauthorizedException('رمز التحقق منتهي الصلاحية أو غير صالح');
     }
 
     await this.prisma.users.update({
@@ -74,7 +95,7 @@ export class AuthService {
     const user = await this.prisma.users.findUnique({ where: { email } });
 
     if (!user) {
-      throw new UnauthorizedException('Email not found');
+      throw new UnauthorizedException('البريد الإلكتروني غير موجود');
     }
 
     const resetToken = this.generateToken();
@@ -91,7 +112,7 @@ export class AuthService {
     await this.mailService.sendPasswordResetEmail(email, resetToken);
 
     return {
-      message: 'Password reset email sent successfully',
+      message: 'تم إرسال رابط إعادة تعيين كلمة المرور بنجاح',
     };
   }
 
@@ -101,7 +122,9 @@ export class AuthService {
     });
 
     if (!user || new Date() > user.passwordResetExpiry) {
-      throw new UnauthorizedException('Token expired or invalid');
+      throw new UnauthorizedException(
+        'رمز إعادة التعيين منتهي الصلاحية أو غير صالح',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);

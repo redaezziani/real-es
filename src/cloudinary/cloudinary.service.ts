@@ -29,4 +29,16 @@ export class CloudinaryService {
       });
     });
   }
+
+  async uploadFromUrl(
+    fileUrl: string,
+    folderName: string,
+  ): Promise<UploadApiResponse | UploadApiErrorResponse> {
+    return new Promise((resolve, reject) => {
+      v2.uploader.upload(fileUrl, { folder: folderName }, (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      });
+    });
+  }
 }

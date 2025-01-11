@@ -35,6 +35,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.redisClient.expire(key, seconds);
   }
 
+  async clearAll(): Promise<void> {
+    await this.redisClient.flushall();
+  }
+
   async onModuleDestroy() {
     await this.redisClient.quit();
   }

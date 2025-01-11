@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Post,
+  Res,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
@@ -23,8 +26,17 @@ export class AuthController {
 
   @Post('login')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Res() request: Response) {
+    const { token, user } = await this.authService.login(loginDto);
+    request.cookie('user-token', token, {
+      httpOnly: false,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      domain:
+        process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    request.send({ user });
   }
 
   @Post('verify-email')
@@ -46,5 +58,19 @@ export class AuthController {
       resetPasswordDto.resetToken,
       resetPasswordDto.newPassword,
     );
+  }
+  @Delete('logout')
+  async logout(@Res() request: Response) {
+    // Clear the cookie by setting it to an empty string
+    request.cookie('user-token', '', {
+      httpOnly: false,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      domain:
+        process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost',
+      maxAge: 0,
+    });
+
+    request.send({ message: 'Logged out successfully' });
   }
 }
