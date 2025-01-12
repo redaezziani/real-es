@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-// import { RmqOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { VersioningType, ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
@@ -8,6 +7,8 @@ import { Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Move cookie-parser before other middleware
+  app.use(cookieParser());
   // add a prefix to all routes
   app.setGlobalPrefix('api');
   app.connectMicroservice({
@@ -28,18 +29,21 @@ async function bootstrap() {
   });
   // Swagger setup
   const config = new DocumentBuilder()
-    .setTitle('Real Estate Management API')
-    .setDescription(
-      'The Real Estate Management API is a RESTful API for managing real estate data.',
-    )
+    .setTitle('Manga API Documentation')
+    .setDescription('API documentation for the Manga Management System')
     .setVersion('1.0')
-    .addTag('real-estate')
+    .addBearerAuth() // Simplified bearer auth setup
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
-  SwaggerModule.setup('swagger', app, documentFactory, {
-    jsonDocumentUrl: 'swagger/json',
+
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      security: [{ bearer: [] }],
+    },
   });
+
   // Enable versioning
   app.enableVersioning({
     type: VersioningType.URI,
@@ -48,8 +52,9 @@ async function bootstrap() {
   app.enableCors({
     origin: 'http://localhost:3000',
     credentials: true, // Important for cookies
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   });
-  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -8,12 +8,16 @@ import { Manga } from '@prisma/client';
 import { UploadApiResponse } from 'cloudinary';
 import { GetChapterDto } from './dtos/get-chapter';
 import slugify from 'slugify';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationPriority } from '@prisma/client';
+
 @Injectable()
 export class ScraperService {
   constructor(
     private readonly scraperRepository: IsheqScraperRepository,
     private readonly cloudinaryService: CloudinaryService,
     private readonly prismaService: PrismaService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getManga(getMangaDto: GetMangaDto): Promise<Manga> {
@@ -58,6 +62,29 @@ export class ScraperService {
           slug,
         },
       });
+
+      // Notify admins about new manga
+      const admins = await this.prismaService.profiles.findMany({
+        where: { role: 'ADMIN' },
+        select: { userId: true },
+      });
+
+      // Send notifications to all admins
+      await Promise.all(
+        admins.map((admin) =>
+          this.notificationsService.createAndSendNotification(
+            admin.userId,
+            'NEW_MANGA',
+            {
+              mangaId: manga.id,
+              title: manga.title,
+              slug: manga.slug,
+              coverUrl: manga.cover,
+            },
+            NotificationPriority.HIGH,
+          ),
+        ),
+      );
 
       return manga;
     } catch (error) {
@@ -122,7 +149,42 @@ export class ScraperService {
             })),
           },
         },
+        include: {
+          manga: true,
+        },
       });
+
+      // Get users with notification preferences for this manga
+      const interestedUsers =
+        await this.prismaService.notificationPreference.findMany({
+          where: {
+            inAppEnabled: true,
+            categories: {
+              has: 'MANGA_UPDATES',
+            },
+          },
+          select: {
+            userId: true,
+          },
+        });
+
+      // Send notifications to interested users
+      await Promise.all(
+        interestedUsers.map((user) =>
+          this.notificationsService.createAndSendNotification(
+            user.userId,
+            'NEW_CHAPTER',
+            {
+              mangaId: chapter.manga.id,
+              mangaTitle: chapter.manga.title,
+              chapterId: chapter.id,
+              chapterNumber: chapter.number,
+            },
+            NotificationPriority.MEDIUM,
+          ),
+        ),
+      );
+
       return chapter;
     } catch (error) {
       console.log(error);

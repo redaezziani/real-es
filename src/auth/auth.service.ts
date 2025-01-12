@@ -55,13 +55,12 @@ export class AuthService {
     });
 
     if (!user || !(await bcrypt.compare(loginDto.password, user.password))) {
-      throw new UnauthorizedException(
-        'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-      );
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    // set the jwt in the cookie and also return the user :name and :email and profile
     const jwt = this.jwtService.sign({ sub: user.id });
+
+    // Return both cookie options and response data
     return {
       token: jwt,
       user: {
@@ -69,6 +68,17 @@ export class AuthService {
         email: user.email,
         profile: user.profile,
       },
+      cookie: {
+        name: 'user-token',
+        value: jwt,
+        options: {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        }
+      }
     };
   }
 

@@ -1,0 +1,90 @@
+=====================================================
+MANGA API DOCUMENTATION
+=====================================================
+
+1. GET ALL MANGAS
+-----------------------------------------------------
+Endpoint: GET /manga/all
+Query Parameters:
+- page (default: 1)
+- limit (default: 10)
+- search (optional)
+Example: http://localhost:3000/manga/all?page=1&limit=10&search=naruto
+
+2. GET SINGLE MANGA
+-----------------------------------------------------
+Endpoint: GET /manga/info/:id
+Parameters:
+- id (manga ID or slug)
+Example: http://localhost:3000/manga/info/1234
+         http://localhost:3000/manga/info/naruto-shippuden
+
+3. POPULAR MANGAS
+-----------------------------------------------------
+Endpoint: GET /manga/popular
+Returns: Top 10 mangas sorted by rating and views
+Example: http://localhost:3000/manga/popular
+
+4. LATEST MANGAS
+-----------------------------------------------------
+Endpoint: GET /manga/latest
+Returns: 10 most recent mangas
+Example: http://localhost:3000/manga/latest
+
+5. MANGAS BY GENRE
+-----------------------------------------------------
+Endpoint: GET /manga/genre/:genre
+Parameters:
+- genre (genre name)
+Query Parameters:
+- page (default: 1)
+- limit (default: 10)
+Example: http://localhost:3000/manga/genre/action?page=1&limit=10
+
+6. AUTOCOMPLETE SEARCH
+-----------------------------------------------------
+Endpoint: GET /manga/search/autocomplete
+Query Parameters:
+- search (required)
+Example: http://localhost:3000/manga/search/autocomplete?search=nar
+
+=====================================================
+RESPONSE FORMATS
+=====================================================
+
+1. Paginated Response:
+{
+  "success": boolean,
+  "data": {
+    "items": Manga[],
+    "meta": {
+      "currentPage": number,
+      "itemsPerPage": number,
+      "totalItems": number,
+      "totalPages": number
+    }
+  }
+}
+
+2. Single Item Response:
+{
+  "success": boolean,
+  "message": string (optional),
+  "data": Manga
+}
+
+3. Autocomplete Response:
+{
+  "success": boolean,
+  "data": string[],
+  "query": string
+}
+
+=====================================================
+ERROR HANDLING
+=====================================================
+All endpoints return HTTP 400 (Bad Request) on error with:
+{
+  "success": false,
+  "message": "Error description"
+}

@@ -7,6 +7,20 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+enum NotificationStatus {
+    PENDING
+    SENT
+    FAILED
+    READ
+}
+
+enum NotificationPriority {
+    LOW
+    MEDIUM
+    HIGH
+    URGENT
+}
+
 model Users {
     id                        String                     @id @default(uuid())
     name                      String
@@ -22,6 +36,8 @@ model Users {
     emailVerificationRequests EmailVerificationRequest[]
     passwordResetRequests     PasswordResetRequest[]
     profile                   Profiles?
+    NotificationPreference    NotificationPreference?
+    Notification              Notification[]
 }
 
 model EmailVerificationRequest {
@@ -75,7 +91,7 @@ model Manga {
     id          String    @id @default(uuid())
     title       String
     slug        String?   @unique
-    rating      Float    @default(0)
+    rating      Float     @default(0)
     otherTitles String[]
     description String
     cover       String
@@ -85,7 +101,7 @@ model Manga {
     releaseDate DateTime
     status      String
     genres      String[]
-    views       Int      @default(0)
+    views       Int       @default(0)
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
     chapters    Chapter[]
@@ -98,7 +114,7 @@ model Chapter {
     number      Int
     releaseDate DateTime
     mangaId     String
-    views       Int      @default(0)    
+    views       Int      @default(0)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
     manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
@@ -113,4 +129,36 @@ model Page {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreference {
+    id           String   @id @default(uuid())
+    userId       String   @unique
+    emailEnabled Boolean  @default(true)
+    pushEnabled  Boolean  @default(true)
+    inAppEnabled Boolean  @default(true)
+    categories   String[] @default([])
+    user         Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+}
+
+model Notification {
+    id          String               @id @default(uuid())
+    type        String
+    title       String
+    message     String
+    data        Json?
+    channels    String[]
+    status      NotificationStatus   @default(PENDING)
+    priority    NotificationPriority @default(MEDIUM)
+    recipientId String?
+    recipient   Users?               @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+    readAt      DateTime?
+    sentAt      DateTime?
+    createdAt   DateTime             @default(now())
+    updatedAt   DateTime             @updatedAt
+
+    @@index([recipientId, status])
+    @@index([type])
 }

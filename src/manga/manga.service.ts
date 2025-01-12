@@ -5,11 +5,13 @@ import { IManga } from './manga.interface';
 import { Manga } from '@prisma/client';
 
 import { AutoCompleteDto } from './dtos/auto-complet';
+import { MangaQueryDto } from './dtos/manga-query.dto';
 import {
   PaginatedResponse,
   SingleResponse,
 } from '../common/types/api-response.type';
 import { PaginationQueryDto } from '../common/dtos/pagination-query.dto';
+import { ChapterPageDto } from './dtos/chapter-pages.dto';
 
 @Injectable()
 export class MangaService implements IManga {
@@ -18,78 +20,150 @@ export class MangaService implements IManga {
     private readonly redisService: RedisService,
   ) {}
 
-  async all(query: PaginationQueryDto): Promise<PaginatedResponse<Manga>> {
+  async all(query: MangaQueryDto): Promise<PaginatedResponse<Manga>> {
     try {
-      const { search = '', limit = 10, page = 1 } = query;
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        genres,
+        status,
+        minRating,
+        themes,
+        types,
+      } = query;
 
-      // Ensure numbers are used
-      const take = Number(limit);
-      const skip = (Number(page) - 1) * take;
+      const skip = (page - 1) * limit;
 
-      const [data, totalCount] = await Promise.all([
+      // Build the where clause based on filters
+      const where: any = {};
+
+      if (search) {
+        const searchTerm = search.toLowerCase().trim();
+        where.OR = [
+          {
+            title: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+          {
+            otherTitles: {
+              hasSome: [searchTerm], // Fix: Wrap searchTerm in array
+            },
+          },
+          {
+            slug: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+          {
+            description: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+        ];
+      }
+
+      if (Array.isArray(genres) && genres.length > 0) {
+        where.genres = {
+          hasEvery: genres,
+        };
+      }
+
+      if (Array.isArray(status) && status.length > 0) {
+        where.status = {
+          in: status,
+        };
+      }
+
+      if (minRating) {
+        where.rating = {
+          gte: minRating,
+        };
+      }
+
+      if (Array.isArray(themes) && themes.length > 0) {
+        where.themes = {
+          hasEvery: themes,
+        };
+      }
+
+      if (Array.isArray(types) && types.length > 0) {
+        where.type = {
+          in: types,
+        };
+      }
+
+      const [items, totalItems] = await Promise.all([
         this.prismaService.manga.findMany({
-          where: {
-            OR: [{ title: { contains: search } }],
-          },
+          where,
           skip,
-          take,
-        }),
-        this.prismaService.manga.count({
-          where: {
-            OR: [{ title: { contains: search } }],
+          take: limit,
+          orderBy: {
+            updatedAt: 'desc',
           },
         }),
+        this.prismaService.manga.count({ where }),
       ]);
 
-      const totalPages = Math.ceil(totalCount / take);
+      const totalPages = Math.ceil(totalItems / limit);
 
       return {
         success: true,
         data: {
-          items: data,
+          items,
           meta: {
-            currentPage: Number(page),
-            itemsPerPage: take,
-            totalItems: totalCount,
+            currentPage: page,
+            itemsPerPage: limit,
+            totalItems,
             totalPages,
           },
         },
       };
     } catch (error) {
-      throw new Error(error.message);
+      console.error('Error in all manga query:', error);
+      throw new Error(`Failed to fetch mangas: ${error.message}`);
     }
   }
 
   async byId(id: string): Promise<SingleResponse<Manga>> {
-    const manga = await this.prismaService.manga.findFirst({
-      where: {
-        OR: [{ id }, { slug: id }],
-      },
-      include: {
-        chapters: true,
-      },
-    });
-    // if manga is not found
-    if (!manga) {
-      return {
-        success: false,
-        message: 'Manga not found',
-        data: null,
-      };
-    }
-    await this.prismaService.manga.update({
-      where: {
-        id: manga.id,
-      },
-      data: {
-        views: manga.views + 1,
-      },
-    });
+    try {
+      const manga = await this.prismaService.manga.findFirst({
+        where: {
+          OR: [{ id }, { slug: id }],
+        },
+        include: {
+          chapters: true,
+        },
+      });
+      // if manga is not found
+      if (!manga) {
+        return {
+          success: false,
+          message: 'Manga not found',
+          data: null,
+        };
+      }
+      await this.prismaService.manga.update({
+        where: {
+          id: manga.id,
+        },
+        data: {
+          views: manga.views + 1,
+        },
+      });
 
-    return {
-      success: true,
-      data: manga,
-    };
+      return {
+        success: true,
+        data: manga,
+      };
+    } catch (error) {
+      console.error('Error in byId manga query:', error);
+      throw new Error(`Failed to fetch manga by id: ${error.message}`);
+    }
   }
 
   async getPopularMangas(): Promise<Manga[]> {
@@ -99,7 +173,8 @@ export class MangaService implements IManga {
       >`SELECT * FROM "Manga" ORDER BY rating DESC, views DESC LIMIT 10`;
       return raw;
     } catch (error) {
-      throw new Error(error.message);
+      console.error('Error in getPopularMangas:', error);
+      throw new Error(`Failed to fetch popular mangas: ${error.message}`);
     }
   }
   async getLatestMangas(): Promise<Manga[]> {
@@ -112,7 +187,8 @@ export class MangaService implements IManga {
       });
       return mangas;
     } catch (error) {
-      throw new Error(error.message);
+      console.error('Error in getLatestMangas:', error);
+      throw new Error(`Failed to fetch latest mangas: ${error.message}`);
     }
   }
   async getMangaByGenre(
@@ -161,7 +237,8 @@ export class MangaService implements IManga {
         },
       };
     } catch (error) {
-      throw new Error(error.message);
+      console.error('Error in getMangaByGenre:', error);
+      throw new Error(`Failed to fetch manga by genre: ${error.message}`);
     }
   }
   // New autocomplete method
@@ -218,7 +295,125 @@ export class MangaService implements IManga {
 
       return formattedResults;
     } catch (error) {
+      console.error('Error in autocomplete:', error);
       throw new Error(`Autocomplete failed: ${error.message}`);
+    }
+  }
+  async getStatus(): Promise<string[]> {
+    try {
+      const status = await this.prismaService.manga.findMany({
+        select: {
+          status: true,
+        },
+      });
+
+      const uniqueStatus = [
+        ...new Set(status.map((manga) => manga.status)),
+      ].filter((status) => status !== null);
+
+      return uniqueStatus;
+    } catch (error) {
+      console.error('Error in getStatus:', error);
+      throw new Error(`Failed to fetch status: ${error.message}`);
+    }
+  }
+  async getGenres(): Promise<string[]> {
+    try {
+      const genres = await this.prismaService.manga.findMany({
+        select: {
+          genres: true,
+        },
+      });
+
+      const uniqueGenres = [
+        ...new Set(genres.flatMap((manga) => manga.genres)),
+      ];
+
+      return uniqueGenres;
+    } catch (error) {
+      console.error('Error in getGenres:', error);
+      throw new Error(`Failed to fetch genres: ${error.message}`);
+    }
+  }
+  async getTypes(): Promise<string[]> {
+    try {
+      const types = await this.prismaService.manga.findMany({
+        select: {
+          type: true,
+        },
+      });
+
+      const uniqueTypes = [...new Set(types.map((manga) => manga.type))].filter(
+        (type) => type !== null,
+      );
+
+      return uniqueTypes;
+    } catch (error) {
+      console.error('Error in getTypes:', error);
+      throw new Error(`Failed to fetch types: ${error.message}`);
+    }
+  }
+
+  async getChapterPages(
+    id: string,
+    chapter: string,
+  ): Promise<SingleResponse<ChapterPageDto>> {
+    try {
+      const manga = await this.prismaService.manga.findFirst({
+        where: {
+          OR: [{ id }, { slug: id }],
+        },
+        select: {
+          title: true,
+          chapters: {
+            where: {
+              number: parseInt(chapter),
+            },
+            select: {
+              title: true,
+              number: true,
+              pages: {
+                select: {
+                  image: true,
+                },
+                orderBy: {
+                  number: 'asc',
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!manga) {
+        return {
+          success: false,
+          message: 'Manga not found',
+          data: null,
+        };
+      }
+
+      const chapterData = manga.chapters[0];
+      if (!chapterData) {
+        return {
+          success: false,
+          message: 'Chapter not found',
+          data: null,
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          mangaName: manga.title,
+          chapterName: chapterData.title,
+          chapterNumber: chapterData.number,
+          pages: chapterData.pages.map((page) => page.image),
+        },
+      };
+    } catch (error) {
+      console.error('Error in getChapterPages:', error);
+      throw new Error(`Failed to fetch chapter pages: ${error.message}`);
     }
   }
 }

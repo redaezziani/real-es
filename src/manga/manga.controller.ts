@@ -11,7 +11,12 @@ import { Manga } from '@prisma/client';
 import { AutoCompleteDto } from './dtos/auto-complet';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../common/dtos/pagination-query.dto';
-import { PaginatedResponse } from 'src/common/types/api-response.type';
+import {
+  PaginatedResponse,
+  SingleResponse,
+} from 'src/common/types/api-response.type';
+import { MangaQueryDto } from './dtos/manga-query.dto';
+import { ChapterPageDto } from './dtos/chapter-pages.dto';
 
 @ApiTags('manga')
 @Controller('manga')
@@ -58,8 +63,11 @@ export class MangaController {
   }
 
   @Get('all')
-  @ApiResponse({ status: 200, description: 'List of mangas with pagination' })
-  async all(@Query() query: PaginationQueryDto) {
+  @ApiResponse({
+    status: 200,
+    description: 'List of mangas with pagination and filters',
+  })
+  async all(@Query() query: MangaQueryDto) {
     try {
       return this.mangaService.all(query);
     } catch (error) {
@@ -103,5 +111,31 @@ export class MangaController {
   @ApiResponse({ status: 200, description: 'Single manga details' })
   async byId(@Param('id') id: string) {
     return this.mangaService.byId(id);
+  }
+  // get the pages of a chapter
+  @Get('/manga/:id/chapter/:chapter')
+  @ApiResponse({
+    status: 200,
+    description: 'Get the pages of a chapter',
+    type: ChapterPageDto,
+  })
+  async getChapterPages(
+    @Param('id') id: string,
+    @Param('chapter') chapter: string,
+  ): Promise<SingleResponse<ChapterPageDto>> {
+    return this.mangaService.getChapterPages(id, chapter);
+  }
+
+  @Get('status')
+  async getStatus(): Promise<string[]> {
+    return this.mangaService.getStatus();
+  }
+  @Get('genres')
+  async getGenres(): Promise<string[]> {
+    return this.mangaService.getGenres();
+  }
+  @Get('types')
+  async getTypes(): Promise<string[]> {
+    return this.mangaService.getTypes();
   }
 }

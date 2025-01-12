@@ -12,6 +12,7 @@ import { AppController } from './app/app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { ScraperModule } from './scraper/scraper.module';
 import { MangaModule } from './manga/manga.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,8 +27,9 @@ import { MangaModule } from './manga/manga.module';
     RedisModule,
     ScraperModule,
     MangaModule,
+    NotificationsModule,
   ],
-  controllers: [AppController], // Removed MangaController from here
+  controllers: [AppController],
   providers: [
     PrismaService,
     {

@@ -7,16 +7,17 @@ import { PrismaService } from 'src/shared/prisma.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailService } from 'src/shared/mail.service';
+
 @Module({
   imports: [
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: config.get<string>('JWT_EXPIRATION') },
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET'),
+        signOptions: { expiresIn: '24h' },
       }),
+      inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
@@ -27,6 +28,6 @@ import { MailService } from 'src/shared/mail.service';
     MailService,
     ConfigService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtModule],
 })
 export class AuthModule {}
