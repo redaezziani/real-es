@@ -87,23 +87,29 @@ model Profiles {
     @@index([userId])
 }
 
+enum ScraperPlatform {
+    ASHEQ
+    ARES
+}
+
 model Manga {
-    id          String    @id @default(uuid())
+    id          String          @id @default(uuid())
     title       String
-    slug        String?   @unique
-    rating      Float     @default(0)
+    slug        String?         @unique
+    rating      Float           @default(0)
     otherTitles String[]
     description String
     cover       String
     authors     String[]
     artists     String[]
+    platform    ScraperPlatform @default(ASHEQ)
     type        String
     releaseDate DateTime
     status      String
     genres      String[]
-    views       Int       @default(0)
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
+    views       Int             @default(0)
+    createdAt   DateTime        @default(now())
+    updatedAt   DateTime        @updatedAt
     chapters    Chapter[]
 }
 

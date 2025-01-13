@@ -1,18 +1,22 @@
 import { Module } from '@nestjs/common';
 import { ScraperService } from './scraper.service';
 import { ScraperController } from './scraper.controller';
-import { IsheqScraperRepository } from './repository/scraper.repository';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { PrismaService } from 'src/shared/prisma.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ScraperFactory } from './scraper.factory';
+import { AsheqScraperRepository } from './repository/asheq.repository';
+import { AresScraperRepository } from './repository/ares.repository';
 
 @Module({
   imports: [NotificationsModule],
   providers: [
     ScraperService,
-    IsheqScraperRepository,
+    ScraperFactory,
     CloudinaryService,
     PrismaService,
+    AsheqScraperRepository,
+    AresScraperRepository,
   ],
   controllers: [ScraperController],
 })

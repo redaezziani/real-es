@@ -1,35 +1,24 @@
-// scraper.repository.ts
-import { GetMangaDto } from '../dtos/get-manga';
 import { Manga } from '../types/manga.type';
-import { Scraper } from '../scraper.interface';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import { Chapter, IScraper } from '../interface/scraper';
 
-interface Chapter {
-  title: string;
-  number: number;
-  releaseDate: Date;
-  pages: string[];
-}
-export class IsheqScraperRepository implements Scraper {
+export class AsheqScraperRepository implements IScraper {
   readonly url: string;
 
   constructor() {
     this.url = 'https://3asq.org';
   }
 
-  async getManga(getMangaDto: GetMangaDto): Promise<Manga> {
-    const { title } = getMangaDto;
+  async getManga(title: string): Promise<Manga> {
     const url = `${this.url}/manga/${title}`;
     const html = await this.getHtml(url);
-    const manga = this.getMangaData(html);
-    return manga;
+    return this.getMangaData(html);
   }
   async getChapter(slug: string, chapterNumber: string): Promise<Chapter> {
     const url = `${this.url}/manga/${slug}/${chapterNumber}`;
     const html = await this.getHtml(url);
-    const chapter = this.getChapterData(html, chapterNumber);
-    return chapter;
+    return this.getChapterData(html, chapterNumber);
   }
 
   private async getHtml(url: string): Promise<string> {

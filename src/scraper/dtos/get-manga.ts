@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Length } from 'class-validator';
+import { ScraperPlatform } from '../types/enums/platform.enum';
 
 export class GetMangaDto {
   @ApiProperty({
@@ -12,4 +13,11 @@ export class GetMangaDto {
   @IsNotEmpty()
   @Length(3, 100)
   title: string;
+  @ApiProperty({
+    description: 'Platform of the manga ',
+    example: 'ASHEQ',
+    enum: ScraperPlatform,
+  })
+  @IsNotEmpty()
+  platform: ScraperPlatform;
 }

@@ -1,7 +1,6 @@
 // scraper.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { GetMangaDto } from './dtos/get-manga';
-import { IsheqScraperRepository } from './repository/scraper.repository';
 import { CloudinaryService } from './../cloudinary/cloudinary.service';
 import { PrismaService } from 'src/shared/prisma.service';
 import { Manga } from '@prisma/client';
@@ -10,19 +9,26 @@ import { GetChapterDto } from './dtos/get-chapter';
 import slugify from 'slugify';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationPriority } from '@prisma/client';
+import { ScraperPlatform } from './types/enums/platform.enum';
+import { IScraper } from './interface/scraper';
+import { ScraperFactory } from './scraper.factory';
 
 @Injectable()
 export class ScraperService {
+  private readonly scrapers: Map<ScraperPlatform, IScraper>;
   constructor(
-    private readonly scraperRepository: IsheqScraperRepository,
     private readonly cloudinaryService: CloudinaryService,
     private readonly prismaService: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly scraperFactory: ScraperFactory,
   ) {}
 
   async getManga(getMangaDto: GetMangaDto): Promise<Manga> {
     try {
-      const mangaData = await this.scraperRepository.getManga(getMangaDto);
+      const scraper = this.scraperFactory.getScraper(
+        getMangaDto.platform || ScraperPlatform.ASHEQ,
+      );
+      const mangaData = await scraper.getManga(getMangaDto.title);
 
       if (!mangaData || !mangaData.cover) {
         throw new BadRequestException(
@@ -49,6 +55,7 @@ export class ScraperService {
       });
       const manga = await this.prismaService.manga.create({
         data: {
+            
           title: mangaData.title,
           otherTitles: mangaData.otherTitles,
           description: mangaData.description,
@@ -99,17 +106,19 @@ export class ScraperService {
   }
   async getChapter(getChapterDto: GetChapterDto) {
     try {
-      // get the manga slug and chapter number
       const { mangaId, chapterNumber } = getChapterDto;
       const manga = await this.prismaService.manga.findUnique({
         where: { id: mangaId },
-        select: { slug: true },
+        select: { slug: true, platform: true },
       });
-      // Get chapter data from repository
-      const chapterData = await this.scraperRepository.getChapter(
-        manga.slug,
-        chapterNumber,
-      );
+
+      if (!manga) {
+        throw new BadRequestException('Manga not found');
+      }
+
+      const platform = manga.platform as ScraperPlatform;
+      const scraper = this.scraperFactory.getScraper(platform);
+      const chapterData = await scraper.getChapter(manga.slug, chapterNumber);
 
       if (!chapterData || !chapterData.pages || !chapterData.pages.length) {
         throw new BadRequestException(
