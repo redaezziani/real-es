@@ -14,6 +14,9 @@ import { RegisterDto } from './dtos/register.dto';
 import { VerifyEmailDto } from './dtos/verify-email.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { RequestResetDto } from './dtos/request-reset.dto';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -25,18 +28,9 @@ export class AuthController {
   }
 
   @Post('login')
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  async login(@Body() loginDto: LoginDto, @Res() request: Response) {
-    const { token, user } = await this.authService.login(loginDto);
-    request.cookie('user-token', token, {
-      httpOnly: false,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-      domain:
-        process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-    request.send({ user });
+  @ApiOperation({ summary: 'Login user' })
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
   @Post('verify-email')

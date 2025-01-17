@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, RequestTimeoutException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationStatus, NotificationPriority } from '@prisma/client';
@@ -38,6 +38,8 @@ export class NotificationsService {
     });
 
     // Send real-time notification if IN_APP is included in channels
+
+    console.log('template.channels', template.channels, notification);
     if (template.channels.includes('IN_APP')) {
       await this.notificationsGateway.sendNotificationToUser(
         recipientId,
@@ -93,6 +95,7 @@ export class NotificationsService {
     page: number,
     limit: number,
     status?: NotificationStatus,
+    seenStatus?: 'SEEN' | 'UNSEEN',
   ) {
     this.logger.debug(`Getting paginated notifications for user: ${userId}`);
     if (!userId) {
@@ -100,37 +103,54 @@ export class NotificationsService {
       throw new Error('User ID is required');
     }
 
-    const skip = (page - 1) * limit;
-    console.log('the current user:', userId);
-    const [notifications, total] = await Promise.all([
-      this.prisma.notification.findMany({
-        where: {
-          recipientId: userId,
-          ...(status && { status }),
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        skip,
-        take: limit,
-      }),
-      this.prisma.notification.count({
-        where: {
-          recipientId: userId,
-          ...(status && { status }),
-        },
-      }),
-    ]);
-
-    return {
-      data: notifications,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+    const whereClause = {
+      recipientId: userId,
+      ...(status && { status }),
+      ...(seenStatus === 'SEEN' ? { seenAt: { not: null } } : {}),
+      ...(seenStatus === 'UNSEEN' ? { seenAt: null } : {}),
     };
+
+    try {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new RequestTimeoutException()), 5000),
+      );
+
+      const dataPromise = Promise.all([
+        this.prisma.notification.findMany({
+          where: whereClause,
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        this.prisma.notification.count({
+          where: whereClause,
+        }),
+      ]);
+
+      const [notifications, total] = (await Promise.race([
+        dataPromise,
+        timeoutPromise,
+      ])) as [any[], number];
+
+      this.logger.debug(
+        `Found ${notifications.length} notifications out of ${total} total`,
+      );
+
+      return {
+        data: notifications,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error in getPaginatedNotifications: ${error.message}`);
+      throw error;
+    }
   }
 
   async markAllAsRead(userId: string) {
@@ -142,6 +162,24 @@ export class NotificationsService {
       data: {
         status: NotificationStatus.READ,
         readAt: new Date(),
+      },
+    });
+  }
+
+  async deleteNotification(notificationId: string, userId: string) {
+    return this.prisma.notification.delete({
+      where: {
+        id: notificationId,
+        recipientId: userId,
+      },
+    });
+  }
+
+  async bulkDeleteNotifications(notificationIds: string[], userId: string) {
+    return this.prisma.notification.deleteMany({
+      where: {
+        id: { in: notificationIds },
+        recipientId: userId,
       },
     });
   }

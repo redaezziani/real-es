@@ -1,7 +1,11 @@
-import { Injectable, ExecutionContext, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ExecutionContext,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
-import { Observable, firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -17,39 +21,41 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
 
-    if (isPublic) {
+    if (isPublic && isPublic.length > 0) {
       return true;
     }
 
     try {
-      const activationResult = super.canActivate(context);
       const request = context.switchToHttp().getRequest();
+      this.logger.debug(
+        `Authorization header: ${request.headers.authorization}`,
+      );
 
-      let result: boolean;
-      if (activationResult instanceof Observable) {
-        result = await firstValueFrom(activationResult);
-      } else if (activationResult instanceof Promise) {
-        result = await activationResult;
-      } else {
-        result = activationResult as boolean;
-      }
-      
-      this.logger.debug(`Auth result: ${result}, User: ${JSON.stringify(request.user)}`);
-      
-      if (!request.user?.id) {
-        throw new UnauthorizedException('User not authenticated');
+      const result = await super.canActivate(context);
+      const user = request.user;
+
+      this.logger.debug(
+        `Authentication result: ${result}, User: ${JSON.stringify(user)}`,
+      );
+
+      if (!user?.id) {
+        throw new UnauthorizedException('Invalid token or user not found');
       }
 
-      return result;
+      return true;
     } catch (error) {
       this.logger.error(`Authentication failed: ${error.message}`);
-      throw new UnauthorizedException('Authentication failed');
+      throw new UnauthorizedException(
+        'Authentication failed: ' + error.message,
+      );
     }
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any) {
     if (err || !user) {
-      this.logger.error(`JWT validation failed: ${err?.message || 'No user found'}`);
+      this.logger.error(
+        `JWT validation failed: ${err?.message || 'No user found'}`,
+      );
       throw err || new UnauthorizedException('Authentication failed');
     }
     return user;

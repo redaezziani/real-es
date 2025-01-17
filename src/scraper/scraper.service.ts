@@ -25,6 +25,20 @@ export class ScraperService {
 
   async getManga(getMangaDto: GetMangaDto): Promise<Manga> {
     try {
+      const slug = slugify(getMangaDto.title, {
+        replacement: '-',
+        lower: true,
+        strict: true,
+      });
+
+      const existMange = await this.prismaService.manga.findMany({
+        where: {
+          slug: slug,
+        },
+      });
+      if (existMange.length > 0) {
+        throw new BadRequestException('Alredy exist Mange ');
+      }
       const scraper = this.scraperFactory.getScraper(
         getMangaDto.platform || ScraperPlatform.ASHEQ,
       );
@@ -36,7 +50,6 @@ export class ScraperService {
         );
       }
 
-      // Upload cover image
       let coverUrl: string;
       try {
         const uploadResult = await this.uploadCoverImage(mangaData.cover);
@@ -47,15 +60,9 @@ export class ScraperService {
         );
       }
 
-      // Create manga record
-      const slug = slugify(mangaData.title, {
-        replacement: '-',
-        lower: true,
-        strict: true,
-      });
+
       const manga = await this.prismaService.manga.create({
         data: {
-            
           title: mangaData.title,
           otherTitles: mangaData.otherTitles,
           description: mangaData.description,
@@ -70,13 +77,11 @@ export class ScraperService {
         },
       });
 
-      // Notify admins about new manga
       const admins = await this.prismaService.profiles.findMany({
         where: { role: 'ADMIN' },
         select: { userId: true },
       });
 
-      // Send notifications to all admins
       await Promise.all(
         admins.map((admin) =>
           this.notificationsService.createAndSendNotification(

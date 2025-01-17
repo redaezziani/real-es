@@ -4,7 +4,9 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Inject,
   Param,
+  Post,
   Query,
 } from '@nestjs/common';
 import { Manga } from '@prisma/client';
@@ -17,11 +19,17 @@ import {
 } from 'src/common/types/api-response.type';
 import { MangaQueryDto } from './dtos/manga-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
+import { GetMangaDto } from './dtos/get-manga';
+import { GetChapterDto } from './dtos/get-chapter';
+import { ClientProxy } from '@nestjs/microservices';
 
 @ApiTags('manga')
 @Controller('manga')
 export class MangaController {
-  constructor(private readonly mangaService: MangaService) {}
+  constructor(
+    private readonly mangaService: MangaService,
+    @Inject('manga_service') private readonly client: ClientProxy,
+  ) {}
 
   @Get('popular')
   async getPopularMangas(): Promise<Manga[]> {
@@ -137,5 +145,34 @@ export class MangaController {
   @Get('types')
   async getTypes(): Promise<string[]> {
     return this.mangaService.getTypes();
+  }
+  @Post('')
+  async getManga(@Query() getMangaDto: GetMangaDto) {
+    try {
+      this.client.emit('scraper.manga.create', getMangaDto);
+
+      return {
+        statusCode: HttpStatus.ACCEPTED,
+        message: 'Manga scraping request has been queued',
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Post('')
+  async getChapter(@Query() getChapterDto: GetChapterDto) {
+    // Emit event instead of sending message
+    this.client.emit('scraper.chapter.create', getChapterDto);
+
+    return {
+      statusCode: HttpStatus.ACCEPTED,
+      message: 'Chapter scraping request has been queued',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

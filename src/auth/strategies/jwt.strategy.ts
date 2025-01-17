@@ -3,45 +3,42 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(JwtStrategy.name);
 
   constructor(
-    private configService: ConfigService,
-    private prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: Request) => {
-          const token = request?.cookies?.['user-token'];
-          this.logger.debug(`Cookie token found: ${!!token}`);
-          return token;
-        },
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ]),
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: configService.get('JWT_SECRET'),
     });
   }
 
   async validate(payload: any) {
     this.logger.debug(`Validating payload: ${JSON.stringify(payload)}`);
-    
+
     if (!payload.sub) {
       throw new UnauthorizedException('Invalid token');
     }
 
     const user = await this.prisma.users.findUnique({
       where: { id: payload.sub },
+      include: { profile: true },
     });
 
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    return { id: user.id };
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.profile?.role || 'USER',
+    };
   }
 }

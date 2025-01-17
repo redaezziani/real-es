@@ -42,72 +42,39 @@ export class GetNotificationsQueryDto {
 }
 
 export class NotificationResponseDto {
-  @ApiProperty({ example: 'uuid-string' })
+  @ApiProperty()
   id: string;
 
-  @ApiProperty({ example: 'NEW_MANGA' })
+  @ApiProperty()
   type: string;
 
-  @ApiProperty({ example: 'New Manga Added: One Piece' })
+  @ApiProperty()
   title: string;
 
-  @ApiProperty({
-    example: 'A new manga "One Piece" has been added to the library!',
-  })
+  @ApiProperty()
   message: string;
 
-  @ApiProperty({
-    example: {
-      mangaId: 'uuid-string',
-      title: 'One Piece',
-      coverUrl: 'https://example.com/cover.jpg',
-    },
-  })
-  data: any;
-
-  @ApiProperty({
-    type: [String],
-    example: ['IN_APP', 'EMAIL'],
-  })
-  channels: string[];
-
-  @ApiProperty({
-    enum: NotificationStatus,
-    example: NotificationStatus.PENDING,
-  })
+  @ApiProperty({ enum: NotificationStatus })
   status: NotificationStatus;
 
-  @ApiProperty({
-    enum: NotificationPriority,
-    example: NotificationPriority.MEDIUM,
-  })
+  @ApiProperty({ enum: NotificationPriority })
   priority: NotificationPriority;
 
-  @ApiProperty({
-    example: '2024-01-20T12:00:00Z',
-  })
+  @ApiProperty()
   createdAt: Date;
-
-  @ApiProperty({
-    nullable: true,
-    example: '2024-01-20T12:05:00Z',
-  })
-  readAt?: Date;
 }
 
 export class PaginatedNotificationsResponseDto {
-  @ApiProperty({
-    type: [NotificationResponseDto],
-    description: 'Array of notifications',
-  })
+  @ApiProperty({ type: [NotificationResponseDto] })
   data: NotificationResponseDto[];
 
   @ApiProperty({
-    example: {
-      total: 100,
-      page: 1,
-      limit: 10,
-      totalPages: 10,
+    type: 'object',
+    properties: {
+      total: { type: 'number' },
+      page: { type: 'number' },
+      limit: { type: 'number' },
+      totalPages: { type: 'number' },
     },
   })
   meta: {

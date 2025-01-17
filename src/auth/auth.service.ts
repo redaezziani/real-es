@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from 'src/shared/prisma.service';
+import { PrismaService } from '../prisma/prisma.service'; // Fix import path
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
@@ -19,7 +19,10 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const verificationToken = this.generateToken();
+    const verificationToken = this.generateToken({
+      sub: registerDto.email,
+      type: 'email-verification',
+    });
 
     const user = await this.prisma.users.create({
       data: {
@@ -38,47 +41,25 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email: loginDto.email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        password: true,
-        profile: {
-          select: {
-            id: true,
-            image: true,
-          },
-        },
-      },
-    });
+    const { email, password } = loginDto;
+    const user = await this.validateUser(email, password);
 
-    if (!user || !(await bcrypt.compare(loginDto.password, user.password))) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.profile?.role || 'USER',
+    };
 
-    const jwt = this.jwtService.sign({ sub: user.id });
+    const access_token = this.generateToken(payload);
 
-    // Return both cookie options and response data
     return {
-      token: jwt,
       user: {
-        name: user.name,
+        id: user.id,
         email: user.email,
-        profile: user.profile,
+        name: user.name,
+        role: user.profile?.role || 'USER',
       },
-      cookie: {
-        name: 'user-token',
-        value: jwt,
-        options: {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        }
-      }
+      access_token,
     };
   }
 
@@ -108,7 +89,8 @@ export class AuthService {
       throw new UnauthorizedException('البريد الإلكتروني غير موجود');
     }
 
-    const resetToken = this.generateToken();
+    const payload = { sub: user.id, type: 'password-reset' };
+    const resetToken = this.generateToken(payload);
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.prisma.users.update({
@@ -149,8 +131,8 @@ export class AuthService {
     });
   }
 
-  private generateToken(): string {
-    return [...Array(30)].map(() => Math.random().toString(36)[2]).join('');
+  private generateToken(payload: any): string {
+    return this.jwtService.sign(payload);
   }
 
   async validateUser(email: string, password: string): Promise<any> {

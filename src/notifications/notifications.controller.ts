@@ -5,6 +5,8 @@ import {
   UseGuards,
   Request,
   Logger,
+  HttpStatus,
+  HttpException,
   Patch,
   Param,
 } from '@nestjs/common';
@@ -32,29 +34,46 @@ export class NotificationsController {
 
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Get('all')
+  @Get() // Change from 'all' to root path
   @ApiOperation({ summary: 'Get paginated notifications' })
   @ApiResponse({
     status: 200,
+    description: 'Successfully retrieved notifications',
     type: PaginatedNotificationsResponseDto,
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async getPaginatedNotifications(
     @Request() req,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
     @Query('status') status?: NotificationStatus,
   ) {
-    this.logger.debug(`User from request: ${JSON.stringify(req.user)}`);
-    if (!req.user?.id) {
-      this.logger.error('No user found in request');
-      throw new Error('Authentication required');
+    try {
+      this.logger.debug(`Getting notifications for user: ${req.user?.id}`);
+      if (!req.user?.id) {
+        throw new HttpException(
+          'User not authenticated',
+          HttpStatus.UNAUTHORIZED,
+        );
+      }
+
+      const result = await this.notificationsService.getPaginatedNotifications(
+        req.user.id,
+        +page,
+        +limit,
+        status,
+      );
+
+      this.logger.debug(`Found ${result.data.length} notifications`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in getPaginatedNotifications: ${error.message}`);
+      throw new HttpException(
+        error.message || 'Internal server error',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-    return this.notificationsService.getPaginatedNotifications(
-      req.user.id,
-      +page,
-      +limit,
-      status,
-    );
   }
 
   @Get('unread')
@@ -84,12 +103,13 @@ export class NotificationsController {
     type: Number,
   })
   async getUnreadCount(@Request() req) {
-    this.logger.debug(`User from request: ${JSON.stringify(req.user)}`);
-    if (!req.user || !req.user.id) {
-      this.logger.error('No user found in request');
-      throw new Error('Authentication required');
+    this.logger.debug(`Getting unread count for user: ${req.user.id}`);
+    try {
+      return await this.notificationsService.getUnreadCount(req.user.id);
+    } catch (error) {
+      this.logger.error(`Error fetching unread count: ${error.message}`);
+      throw error;
     }
-    return this.notificationsService.getUnreadCount(req.user.id);
   }
 
   @Patch(':id/read')
