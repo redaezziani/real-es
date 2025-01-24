@@ -38,14 +38,18 @@ export class NotificationsService {
     });
 
     // Send real-time notification if IN_APP is included in channels
-
-    console.log('template.channels', template.channels, notification);
     if (template.channels.includes('IN_APP')) {
       await this.notificationsGateway.sendNotificationToUser(
         recipientId,
         notification,
       );
     }
+
+    // Mark notification as SENT if any delivery occurs
+    await this.prisma.notification.update({
+      where: { id: notification.id },
+      data: { status: NotificationStatus.SENT, sentAt: new Date() },
+    });
 
     return notification;
   }
@@ -69,7 +73,6 @@ export class NotificationsService {
       this.logger.error('User ID is null or undefined');
       throw new Error('User ID is required');
     }
-    console.log('userId', userId);
     return this.prisma.notification.findMany({
       where: {
         recipientId: userId,

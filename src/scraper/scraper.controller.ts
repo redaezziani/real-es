@@ -11,12 +11,9 @@ export class ScraperController {
   @EventPattern('scraper.manga.create')
   async handleMangaCreation(@Payload() getMangaDto: GetMangaDto) {
     try {
-      console.log('Starting manga scrape:', getMangaDto);
       this.scraperService
         .getManga(getMangaDto)
-        .then((manga) => {
-          console.log('Manga scraping completed:', manga.id);
-        })
+        .then((manga) => {})
         .catch((error) => {
           console.error('Error scraping manga:', error);
         });
@@ -28,13 +25,10 @@ export class ScraperController {
   @EventPattern('scraper.chapter.create')
   async handleChapterCreation(@Payload() getChapterDto: GetChapterDto) {
     try {
-      console.log('Starting chapter scrape:', getChapterDto);
       // Process asynchronously without waiting for response
       this.scraperService
         .getChapter(getChapterDto)
-        .then((chapter) => {
-          console.log('Chapter scraping completed:', chapter.id);
-        })
+        .then((chapter) => {})
         .catch((error) => {
           console.error('Error scraping chapter:', error);
         });

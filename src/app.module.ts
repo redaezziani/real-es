@@ -13,6 +13,9 @@ import { ConfigModule } from '@nestjs/config';
 import { ScraperModule } from './scraper/scraper.module';
 import { MangaModule } from './manga/manga.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
+
 
 @Module({
   imports: [
@@ -28,6 +31,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     ScraperModule,
     MangaModule,
     NotificationsModule,
+    RolesModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [

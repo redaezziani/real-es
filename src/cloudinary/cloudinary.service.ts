@@ -5,6 +5,7 @@ import axios from 'axios';
 
 @Injectable()
 export class CloudinaryService {
+  // Upload image from file buffer
   async uploadImage(
     file: Express.Multer.File,
     folderName: string,
@@ -22,6 +23,7 @@ export class CloudinaryService {
     });
   }
 
+  // Delete image from Cloudinary
   async deleteImage(publicId: string): Promise<{ result: string }> {
     return new Promise((resolve, reject) => {
       v2.uploader.destroy(publicId, (error, result) => {
@@ -31,6 +33,7 @@ export class CloudinaryService {
     });
   }
 
+  // Upload image from URL
   async uploadFromUrl(
     fileUrl: string,
     folderName: string,
@@ -39,7 +42,7 @@ export class CloudinaryService {
       // Validate URL
       const url = new URL(fileUrl);
 
-      // Download image first with proper headers
+      // Download image with proper headers
       const response = await axios.get(fileUrl, {
         responseType: 'arraybuffer',
         headers: {
@@ -59,13 +62,13 @@ export class CloudinaryService {
         throw new BadRequestException('URL does not point to a valid image');
       }
 
-      // Upload buffer to Cloudinary
+      // Upload image buffer to Cloudinary
       return new Promise((resolve, reject) => {
         v2.uploader
           .upload_stream(
             {
               folder: folderName,
-              resource_type: 'auto',
+              resource_type: 'auto', // Detect the file type automatically
               timeout: 60000, // 60 seconds upload timeout
             },
             (error, result) => {
@@ -73,7 +76,7 @@ export class CloudinaryService {
               resolve(result);
             },
           )
-          .end(response.data);
+          .end(response.data); // Upload the downloaded image data
       });
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -91,7 +94,7 @@ export class CloudinaryService {
     }
   }
 
-  // Helper method to retry failed uploads
+  // Helper method to retry failed uploads from URL
   async uploadFromUrlWithRetry(
     fileUrl: string,
     folderName: string,
@@ -111,6 +114,24 @@ export class CloudinaryService {
       }
     }
 
-    throw lastError;
+    throw lastError; // Throw the last error after all retries
+  }
+
+  // Upload image from a buffer directly
+  async uploadFromBuffer(
+    fileBuffer: Buffer,
+    folderName: string,
+  ): Promise<UploadApiResponse | UploadApiErrorResponse> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = v2.uploader.upload_stream(
+        { folder: folderName },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
+
+      stream.Readable.from(fileBuffer).pipe(uploadStream);
+    });
   }
 }

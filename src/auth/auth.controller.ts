@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Inject,
   Post,
   Res,
   UsePipes,
@@ -15,11 +16,15 @@ import { VerifyEmailDto } from './dtos/verify-email.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
 import { RequestResetDto } from './dtos/request-reset.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ClientProxy } from '@nestjs/microservices';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    @Inject('manga_service') private readonly client: ClientProxy,
+  ) {}
 
   @Post('register')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
@@ -36,7 +41,14 @@ export class AuthController {
   @Post('verify-email')
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.authService.verifyEmail(verifyEmailDto.verificationToken);
+    const data = await this.authService.verifyEmail(
+      verifyEmailDto.verificationToken,
+    );
+
+    if (!data) {
+      return { message: 'Invalid or expired token' };
+    }
+    this.client.emit('profile.default.create', { userId: data.id });
   }
 
   @Post('request-password-reset')
@@ -55,7 +67,6 @@ export class AuthController {
   }
   @Delete('logout')
   async logout(@Res() request: Response) {
-    // Clear the cookie by setting it to an empty string
     request.cookie('user-token', '', {
       httpOnly: false,
       sameSite: 'strict',

@@ -12,6 +12,7 @@ import { NotificationPriority } from '@prisma/client';
 import { ScraperPlatform } from './types/enums/platform.enum';
 import { IScraper } from './interface/scraper';
 import { ScraperFactory } from './scraper.factory';
+import * as Sharp from 'sharp'; // Change this line
 
 @Injectable()
 export class ScraperService {
@@ -51,16 +52,17 @@ export class ScraperService {
       }
 
       let coverUrl: string;
+      let coverThumbnail: string;
       try {
         const uploadResult = await this.uploadCoverImage(mangaData.cover);
         coverUrl = uploadResult.secure_url;
+        const uploadTwoResult = await this.generateThumbnail(mangaData.cover);
+        coverThumbnail = uploadTwoResult;
       } catch (error) {
         throw new BadRequestException(
           `Failed to upload cover image: ${error.message}`,
         );
       }
-
-
       const manga = await this.prismaService.manga.create({
         data: {
           title: mangaData.title,
@@ -73,19 +75,24 @@ export class ScraperService {
           releaseDate: mangaData.releaseDate,
           status: mangaData.status,
           genres: mangaData.genres,
+          coverThumbnail: coverThumbnail,
           slug,
         },
       });
 
-      const admins = await this.prismaService.profiles.findMany({
-        where: { role: 'ADMIN' },
+      const clients = await this.prismaService.profiles.findMany({
+        where: { 
+          role: {
+            name: 'USER'
+          }
+        },
         select: { userId: true },
       });
 
       await Promise.all(
-        admins.map((admin) =>
+        clients.map((client) =>
           this.notificationsService.createAndSendNotification(
-            admin.userId,
+            client.userId,
             'NEW_MANGA',
             {
               mangaId: manga.id,
@@ -100,7 +107,6 @@ export class ScraperService {
 
       return manga;
     } catch (error) {
-      console.log(error);
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -201,7 +207,6 @@ export class ScraperService {
 
       return chapter;
     } catch (error) {
-      console.log(error);
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -238,7 +243,6 @@ export class ScraperService {
       // Validate URL format
       new URL(page);
     } catch (error: any) {
-      console.log(error);
       throw new BadRequestException(`Invalid page URL: ${page}`);
     }
 
@@ -252,5 +256,39 @@ export class ScraperService {
     }
 
     return result as UploadApiResponse;
+  }
+
+  private async generateThumbnail(imageUrl: string): Promise<string> {
+    try {
+      // Download the image first
+      const response = await fetch(imageUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+
+      // Create thumbnail using Sharp
+      const thumbnailBuffer = await Sharp(imageBuffer)
+        .resize(200, 300, {
+          fit: 'cover',
+          position: 'center',
+        })
+        .toBuffer();
+
+      // Upload the thumbnail
+      const folderName = 'manga-thumbnails';
+      const result = await this.cloudinaryService.uploadFromBuffer(
+        thumbnailBuffer,
+        folderName,
+      );
+
+      if ('error' in result || !result.secure_url) {
+        throw new BadRequestException('Failed to upload thumbnail image');
+      }
+
+      return result.secure_url;
+    } catch (error) {
+      throw new BadRequestException(
+        'Failed to generate and upload thumbnail: ' + error.message,
+      );
+    }
   }
 }

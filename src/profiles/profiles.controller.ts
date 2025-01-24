@@ -15,6 +15,8 @@ import {
   Put,
 } from '@nestjs/common';
 import { GetByIdDto } from './dtos/get-by-id.dto';
+import { EventPattern, Payload } from '@nestjs/microservices';
+import { CreateDefaultProfileDto } from './dtos/create-default';
 @Controller({ path: 'profiles', version: '1' })
 export class ProfilesController {
   constructor(private readonly service: ProfilesService) {}
@@ -57,5 +59,12 @@ export class ProfilesController {
     } catch (error) {
       return error;
     }
+  }
+  // this is well me a default event pattern:profile.default.create
+  @EventPattern('profile.default.create')
+  async handleProfileCreate(
+    @Payload() createDefaultProfileDto: CreateDefaultProfileDto,
+  ) {
+    return await this.service.createDefaultProfile(createDefaultProfileDto);
   }
 }

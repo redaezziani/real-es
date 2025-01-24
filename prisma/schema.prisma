@@ -21,6 +21,74 @@ enum NotificationPriority {
     URGENT
 }
 
+enum HttpMethod {
+    GET
+    POST
+    PUT
+    DELETE
+    PATCH
+}
+
+model Role {
+    id          String           @id @default(uuid())
+    name        String           @unique
+    description String?
+    createdAt   DateTime         @default(now())
+    updatedAt   DateTime         @updatedAt
+    permissions RolePermission[]
+    profiles    Profiles[]
+}
+
+model Permission {
+    id              String           @id @default(uuid())
+    resource        String
+    method          HttpMethod
+    path            String
+    description     String?
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    rolePermissions RolePermission[]
+
+    @@unique([resource, method, path])
+}
+
+model RolePermission {
+    id           String     @id @default(uuid())
+    roleId       String
+    permissionId String
+    role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+    @@unique([roleId, permissionId])
+}
+
+// Update Profiles model to use Role
+model Profiles {
+    id     String  @id @default(uuid())
+    bio    String?
+    phone  String?
+    image  String?
+    userId String  @unique
+    roleId String
+    role   Role    @relation(fields: [roleId], references: [id])
+    user   Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    badge  badge   @default(UNVERIFIED)
+
+    @@index([userId])
+    @@index([roleId])
+}
+
+// Existing models remain the same
+enum roles {
+    ADMIN
+    USER
+}
+
+enum badge {
+    VERIFIED
+    UNVERIFIED
+}
+
 model Users {
     id                        String                     @id @default(uuid())
     name                      String
@@ -64,53 +132,31 @@ model PasswordResetRequest {
     @@index([token])
 }
 
-enum roles {
-    ADMIN
-    USER
-}
-
-enum badge {
-    VERIFIED
-    UNVERIFIED
-}
-
-model Profiles {
-    id     String  @id @default(uuid())
-    bio    String?
-    phone  String?
-    image  String?
-    userId String  @unique
-    role   roles   @default(USER)
-    user   Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    badge  badge   @default(UNVERIFIED)
-
-    @@index([userId])
-}
-
 enum ScraperPlatform {
     ASHEQ
     ARES
 }
 
 model Manga {
-    id          String          @id @default(uuid())
-    title       String
-    slug        String?         @unique
-    rating      Float           @default(0)
-    otherTitles String[]
-    description String
-    cover       String
-    authors     String[]
-    artists     String[]
-    platform    ScraperPlatform @default(ASHEQ)
-    type        String
-    releaseDate DateTime
-    status      String
-    genres      String[]
-    views       Int             @default(0)
-    createdAt   DateTime        @default(now())
-    updatedAt   DateTime        @updatedAt
-    chapters    Chapter[]
+    id             String          @id @default(uuid())
+    title          String
+    slug           String?         @unique
+    rating         Float           @default(0)
+    coverThumbnail String?
+    otherTitles    String[]
+    description    String
+    cover          String
+    authors        String[]
+    artists        String[]
+    platform       ScraperPlatform @default(ASHEQ)
+    type           String
+    releaseDate    DateTime
+    status         String
+    genres         String[]
+    views          Int             @default(0)
+    createdAt      DateTime        @default(now())
+    updatedAt      DateTime        @updatedAt
+    chapters       Chapter[]
 }
 
 model Chapter {

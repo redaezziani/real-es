@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './ws-auth.guard';
+import { JwtService } from '@nestjs/jwt';
 
 @WebSocketGateway({
   cors: {
@@ -20,14 +21,30 @@ import { WsAuthGuard } from './ws-auth.guard';
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
+  constructor(private jwtService: JwtService) {}
+
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(NotificationsGateway.name);
   private userSockets: Map<string, string[]> = new Map();
 
-  handleConnection(client: Socket) {
-    this.logger.log(`Client attempting to connect: ${client.id}`);
-    this.logger.debug('Connection headers:', client.handshake.headers);
-    this.logger.debug('Connection query:', client.handshake.query);
+  async handleConnection(client: Socket) {
+    try {
+      const token = this.extractToken(client);
+      if (!token) {
+        this.logger.error('No token provided');
+        client.disconnect();
+        return;
+      }
+
+      const payload = await this.jwtService.verifyAsync(token);
+      client['user'] = payload;
+
+      this.logger.log(`Client authenticated and connected: ${client.id}`);
+      this.logger.debug('User data:', client['user']);
+    } catch (error) {
+      this.logger.error('Authentication failed:', error.message);
+      client.disconnect();
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -38,10 +55,11 @@ export class NotificationsGateway
 
   @SubscribeMessage('subscribe')
   handleSubscribe(client: Socket) {
-    this.logger.debug('Subscribe attempt from client:', client.id);
+    this.logger.debug('Subscribe attempt from client:', client['user']?.sub);
     this.logger.debug('Client user data:', client['user']);
-    
-    const userId = client['user']?.id;
+
+    const userId = client['user']?.sub;
+    console.log('userId', userId);
     if (!userId) {
       this.logger.error('No user ID found in socket client');
       throw new WsException('User ID not found');
@@ -75,7 +93,27 @@ export class NotificationsGateway
     });
   }
 
+  private extractToken(client: Socket): string | undefined {
+    // Try to get token from headers first
+    const authHeader = client.handshake.headers.authorization;
+    if (authHeader) {
+      const [type, token] = authHeader.split(' ');
+      if (type === 'Bearer') return token;
+    }
+
+    // If not in headers, try query parameters
+    const queryToken = client.handshake.query.auth_token;
+    if (queryToken) {
+      // Clean the token if it has quotes
+      const token = Array.isArray(queryToken) ? queryToken[0] : queryToken;
+      return token.replace(/^["'](.+)["']$/, '$1');
+    }
+
+    return undefined;
+  }
+
   async sendNotificationToUser(userId: string, notification: any) {
+    console.log('userId', userId);
     this.server.to(`user:${userId}`).emit('notification', notification);
   }
 
@@ -84,6 +122,7 @@ export class NotificationsGateway
   }
 
   async sendMangaNotification(notification: any) {
+    // this is mean to be a private channel for manga updates
     this.server.to('manga-updates').emit('manga-notification', notification);
   }
 }

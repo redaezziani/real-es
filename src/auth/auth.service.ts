@@ -54,10 +54,8 @@ export class AuthService {
 
     return {
       user: {
-        id: user.id,
         email: user.email,
         name: user.name,
-        role: user.profile?.role || 'USER',
       },
       access_token,
     };
@@ -80,6 +78,8 @@ export class AuthService {
         verificationTokenExpiry: null,
       },
     });
+
+    return user;
   }
 
   async requestPasswordReset(email: string) {

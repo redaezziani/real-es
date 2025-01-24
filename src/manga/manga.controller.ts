@@ -164,7 +164,7 @@ export class MangaController {
     }
   }
 
-  @Post('')
+  @Post('chapter')
   async getChapter(@Query() getChapterDto: GetChapterDto) {
     // Emit event instead of sending message
     this.client.emit('scraper.chapter.create', getChapterDto);

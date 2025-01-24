@@ -196,6 +196,13 @@ export class MangaService implements IManga {
     query: PaginationQueryDto,
   ): Promise<PaginatedResponse<Manga>> {
     try {
+      // cache key
+      const cacheKey = `genre:${genre}:${JSON.stringify(query)}`;
+      const cachedResults = await this.redisService.get(cacheKey);
+      if (cachedResults) {
+        return JSON.parse(cachedResults);
+      }
+
       const { limit = 10, page = 1 } = query;
       const take = Number(limit);
       const skip = (Number(page) - 1) * take;
@@ -221,9 +228,23 @@ export class MangaService implements IManga {
           },
         }),
       ]);
-
       const totalPages = Math.ceil(totalCount / take);
 
+      await this.redisService.set(
+        cacheKey,
+        JSON.stringify({
+          success: true,
+          data: {
+            items: data,
+            meta: {
+              currentPage: Number(page),
+              itemsPerPage: take,
+              totalItems: totalCount,
+              totalPages,
+            },
+          },
+        }),
+      );
       return {
         success: true,
         data: {
@@ -301,6 +322,13 @@ export class MangaService implements IManga {
   }
   async getStatus(): Promise<string[]> {
     try {
+      // cache key
+      const cacheKey = `status`;
+      const cachedResults = await this.redisService.get(cacheKey);
+      if (cachedResults) {
+        return JSON.parse(cachedResults);
+      }
+
       const status = await this.prismaService.manga.findMany({
         select: {
           status: true,
@@ -311,6 +339,8 @@ export class MangaService implements IManga {
         ...new Set(status.map((manga) => manga.status)),
       ].filter((status) => status !== null);
 
+      await this.redisService.set(cacheKey, JSON.stringify(uniqueStatus));
+
       return uniqueStatus;
     } catch (error) {
       console.error('Error in getStatus:', error);
@@ -319,6 +349,12 @@ export class MangaService implements IManga {
   }
   async getGenres(): Promise<string[]> {
     try {
+      // cache key
+      const cacheKey = `genres`;
+      const cachedResults = await this.redisService.get(cacheKey);
+      if (cachedResults) {
+        return JSON.parse(cachedResults);
+      }
       const genres = await this.prismaService.manga.findMany({
         select: {
           genres: true,
@@ -328,6 +364,8 @@ export class MangaService implements IManga {
       const uniqueGenres = [
         ...new Set(genres.flatMap((manga) => manga.genres)),
       ];
+
+      await this.redisService.set(cacheKey, JSON.stringify(uniqueGenres));
 
       return uniqueGenres;
     } catch (error) {
