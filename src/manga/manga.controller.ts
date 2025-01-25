@@ -136,15 +136,36 @@ export class MangaController {
 
   @Get('status')
   async getStatus(): Promise<string[]> {
-    return this.mangaService.getStatus();
+    try {
+      return this.mangaService.getStatus();
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
   @Get('genres')
   async getGenres(): Promise<string[]> {
-    return this.mangaService.getGenres();
+    try {
+      return this.mangaService.getGenres();
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
   @Get('types')
   async getTypes(): Promise<string[]> {
-    return this.mangaService.getTypes();
+    try {
+      return this.mangaService.getTypes();
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
   @Post('')
   async getManga(@Query() getMangaDto: GetMangaDto) {
