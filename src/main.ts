@@ -58,7 +58,6 @@ async function bootstrap() {
       },
       'JWT-auth', // This name here is important for the @ApiBearerAuth() decorator
     )
-    .addServer('http://localhost:8000', 'Local environment') // Add this line
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -73,13 +72,11 @@ async function bootstrap() {
     customSiteTitle: 'Manga API Docs',
   });
 
-  // Enable versioning
   app.enableVersioning({
     type: VersioningType.URI,
   });
-  // enable cors for all routes
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: '*',
     credentials: true, // Important for cookies
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
@@ -87,9 +84,9 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true, // Enable automatic transformation
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, // Enable implicit conversions
+        enableImplicitConversion: true,
       },
     }),
   );
