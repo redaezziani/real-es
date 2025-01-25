@@ -4,7 +4,7 @@
 DOMAIN_MAIN="redaezziani.com"
 DOMAIN_WWW="www.redaezziani.com"
 EMAIL="klausdev2@email.com" 
-STAGING=0  # Set to 0 for production certificates
+STAGING=1  # Set to 1 for testing (no rate limits)
 DATA_PATH="./certbot"
 RSA_KEY_SIZE=4096
 
@@ -28,79 +28,116 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Check for existing certificates
-if [ -d "$DATA_PATH/conf/live/$DOMAIN_MAIN" ]; then
-    read -p "Existing certificate found. Delete and create new one? (y/N) " decision
-    if [ "$decision" != "Y" ] && [ "$decision" != "y" ]; then
-        log "Using existing certificate"
-        docker-compose up -d
-        exit 0
-    fi
-    log "Removing existing certificates..."
-    rm -rf "$DATA_PATH/conf/live/$DOMAIN_MAIN"
-    rm -rf "$DATA_PATH/conf/archive/$DOMAIN_MAIN"
-    rm -rf "$DATA_PATH/conf/renewal/$DOMAIN_MAIN.conf"
-fi
-
-log "Creating directories..."
+log "Cleaning up old certificates and docker resources..."
+docker-compose down
+rm -rf "$DATA_PATH"
 mkdir -p "$DATA_PATH/conf/live/$DOMAIN_MAIN"
 mkdir -p "$DATA_PATH/www"
 
-# Stop existing containers
-docker-compose down
+log "Starting nginx with minimal config..."
+cat > nginx/app.conf << EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN_MAIN} ${DOMAIN_WWW};
+    
+    location /.well-known/acme-challenge/ {
+        allow all;
+        root /var/www/certbot;
+        try_files \$uri =404;
+    }
 
-log "Creating dummy certificate..."
-openssl req -x509 -nodes -newkey rsa:$RSA_KEY_SIZE -days 1 \
-    -keyout "$DATA_PATH/conf/live/$DOMAIN_MAIN/privkey.pem" \
-    -out "$DATA_PATH/conf/live/$DOMAIN_MAIN/fullchain.pem" \
-    -subj "/CN=localhost"
+    location / {
+        return 200 'Ready for SSL certification';
+    }
+}
+EOF
 
-log "Starting nginx..."
-docker-compose up --force-recreate -d nginx
-
-# Wait for nginx to start
-echo "Waiting for nginx to start..."
-sleep 5
-
-log "Removing dummy certificate..."
-docker-compose run --rm --entrypoint "\
-    rm -rf /etc/letsencrypt/live/$DOMAIN_MAIN && \
-    rm -rf /etc/letsencrypt/archive/$DOMAIN_MAIN && \
-    rm -rf /etc/letsencrypt/renewal/$DOMAIN_MAIN.conf" certbot
+docker-compose up -d nginx
+sleep 10  # Wait for nginx to start
 
 log "Requesting Let's Encrypt certificate..."
-domain_args="-d $DOMAIN_MAIN -d $DOMAIN_WWW"
-email_arg="--email $EMAIL"
-staging_arg=""
-
-if [ $STAGING != "0" ]; then
-    staging_arg="--staging"
-fi
-
 docker-compose run --rm --entrypoint "\
     certbot certonly --webroot -w /var/www/certbot \
-    $staging_arg \
-    $email_arg \
-    $domain_args \
-    --rsa-key-size $RSA_KEY_SIZE \
+    --staging \
+    --email $EMAIL \
+    -d $DOMAIN_MAIN -d $DOMAIN_WWW \
+    --rsa-key-size 4096 \
     --agree-tos \
-    --force-renewal" certbot
+    --force-renewal \
+    --non-interactive" certbot
 
-# Check if certificate was obtained successfully
+if [ $? -eq 0 ]; then
+    log "Staging certificate obtained successfully. Requesting production certificate..."
+    STAGING=0
+    docker-compose run --rm --entrypoint "\
+        certbot certonly --webroot -w /var/www/certbot \
+        --email $EMAIL \
+        -d $DOMAIN_MAIN -d $DOMAIN_WWW \
+        --rsa-key-size 4096 \
+        --agree-tos \
+        --force-renewal \
+        --non-interactive" certbot
+fi
+
 if [ -d "$DATA_PATH/conf/live/$DOMAIN_MAIN" ]; then
-    echo "Certificate obtained successfully!"
+    log "Updating nginx configuration..."
+    cat > nginx/app.conf << EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN_MAIN} ${DOMAIN_WWW};
     
-    # Uncomment HTTPS server block in nginx config
-    sed -i 's/#server {/server {/' nginx/app.conf
-    sed -i 's/#    listen/    listen/' nginx/app.conf
-    sed -i 's/#    ssl_certificate/    ssl_certificate/' nginx/app.conf
-    sed -i 's/#    location/    location/' nginx/app.conf
-    sed -i 's/#    proxy_pass/    proxy_pass/' nginx/app.conf
+    location /.well-known/acme-challenge/ {
+        allow all;
+        root /var/www/certbot;
+        try_files \$uri =404;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${DOMAIN_MAIN} ${DOMAIN_WWW};
     
-    # Restart nginx to apply new configuration
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_MAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_MAIN}/privkey.pem;
+    
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    location / {
+        proxy_pass http://app:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+    log "Restarting nginx..."
     docker-compose restart nginx
+    
+    log "Starting all services..."
+    docker-compose up -d
+    
+    log "Success! Certificate installed and services running."
 else
-    echo "Failed to obtain certificate"
+    error "Failed to obtain SSL certificate"
     exit 1
 fi
 
