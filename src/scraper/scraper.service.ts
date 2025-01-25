@@ -1,4 +1,3 @@
-// scraper.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { GetMangaDto } from './dtos/get-manga';
 import { CloudinaryService } from './../cloudinary/cloudinary.service';
@@ -12,7 +11,7 @@ import { NotificationPriority } from '@prisma/client';
 import { ScraperPlatform } from './types/enums/platform.enum';
 import { IScraper } from './interface/scraper';
 import { ScraperFactory } from './scraper.factory';
-import * as Sharp from 'sharp'; // Change this line
+import * as Sharp from 'sharp';
 
 @Injectable()
 export class ScraperService {
@@ -80,17 +79,17 @@ export class ScraperService {
         },
       });
 
-      const clients = await this.prismaService.profiles.findMany({
+      const admins = await this.prismaService.profiles.findMany({
         where: {
           role: {
-            name: 'USER',
+            name: 'ADMIN',
           },
         },
         select: { userId: true },
       });
 
       await Promise.all(
-        clients.map((client) =>
+        admins.map((client) =>
           this.notificationsService.createAndSendNotification(
             client.userId,
             'NEW_MANGA',
@@ -107,7 +106,6 @@ export class ScraperService {
 
       return manga;
     } catch (error) {
-      console.log(error);
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -138,7 +136,6 @@ export class ScraperService {
         );
       }
 
-      // Upload chapter pages
       const pages = [];
       for (const page of chapterData.pages) {
         try {
@@ -151,7 +148,6 @@ export class ScraperService {
         }
       }
 
-      // save chapter data
       const chapter = await this.prismaService.chapter.create({
         data: {
           number: parseInt(chapterNumber, 10),
@@ -175,23 +171,19 @@ export class ScraperService {
         },
       });
 
-      // Get users with notification preferences for this manga
-      const interestedUsers =
-        await this.prismaService.notificationPreference.findMany({
-          where: {
-            inAppEnabled: true,
-            categories: {
-              has: 'MANGA_UPDATES',
-            },
-          },
-          select: {
-            userId: true,
-          },
-        });
+      // get all the admins then send to theme
 
-      // Send notifications to interested users
+      const admins = await this.prismaService.profiles.findMany({
+        where: {
+          role: {
+            name: 'ADMIN',
+          },
+        },
+        select: { userId: true },
+      });
+
       await Promise.all(
-        interestedUsers.map((user) =>
+        admins.map((user) =>
           this.notificationsService.createAndSendNotification(
             user.userId,
             'NEW_CHAPTER',
@@ -205,7 +197,6 @@ export class ScraperService {
           ),
         ),
       );
-
       return chapter;
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -241,7 +232,6 @@ export class ScraperService {
     }
 
     try {
-      // Validate URL format
       new URL(page);
     } catch (error: any) {
       throw new BadRequestException(`Invalid page URL: ${page}`);

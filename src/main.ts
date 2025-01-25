@@ -56,7 +56,7 @@ async function bootstrap() {
         description: 'Enter JWT token',
         in: 'header',
       },
-      'JWT-auth', // This name here is important for references
+      'JWT-auth', // This name here is important for the @ApiBearerAuth() decorator
     )
     .addServer('http://localhost:8000', 'Local environment') // Add this line
     .build();

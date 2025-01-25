@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     RolesModule,
     PermissionsModule,
     SubscriptionsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

@@ -12,10 +12,15 @@ import {
   UpdateProfileParamsDto,
 } from './dtos/update.dto';
 import { CreateDefaultProfileDto } from './dtos/create-default';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class ProfilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   async createProfile(data: CreateProfileDto) {
     return await this.prisma.profiles.create({
@@ -33,14 +38,10 @@ export class ProfilesService {
     });
   }
 
-  async getProfile(data: GetByIdDto) {
-    return await this.prisma.profiles.findUnique({
-      where: { id: data.id },
-      select: {
-        id: true,
-        image: true,
-        badge: true,
-        bio: true,
+  async getProfile(userId: string) {
+    return this.prisma.profiles.findUnique({
+      where: { userId },
+      include: {
         user: {
           select: {
             email: true,
@@ -52,17 +53,52 @@ export class ProfilesService {
   }
 
   async updateProfile(
-    params: UpdateProfileParamsDto,
-    data: UpdateProfileBodyDto,
+    userId: string, 
+    updateProfileDto: UpdateProfileDto, 
+    file?: Express.Multer.File
   ) {
-    const updateData: any = {};
-    if (data.bio) updateData.bio = data.bio;
-    if (data.phone) updateData.phone = data.phone;
-    if (data.image) updateData.image = data.image;
+    try {
+      let imageUrl: string | undefined;
 
-    return await this.prisma.profiles.update({
-      where: { id: params.profileId },
-      data: updateData,
+      if (file) {
+        const uploadResult = await this.cloudinary.uploadFromBuffer(
+          file.buffer,
+          'profile-images'
+        );
+        imageUrl = uploadResult.secure_url;
+      }
+
+      return await this.prisma.profiles.update({
+        where: { userId },
+        data: {
+          ...updateProfileDto,
+          ...(imageUrl && { image: imageUrl }),
+        },
+        include: {
+          user: {
+            select: {
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      throw new BadRequestException(`Failed to update profile: ${error.message}`);
+    }
+  }
+
+  async updateProfileImage(userId: string, file: Express.Multer.File) {
+    const imageUrl = await this.cloudinary.uploadFromBuffer(
+      file.buffer,
+      'profile-images'
+    );
+
+    return this.prisma.profiles.update({
+      where: { userId },
+      data: {
+        image: imageUrl.secure_url,
+      },
     });
   }
 

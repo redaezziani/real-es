@@ -4,15 +4,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { MailService } from 'src/shared/mail.service';
 import { AuthController } from './auth.controller';
 import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
+import { RolesGuard } from './guards/roles.guard';
+import { SharedModule } from '../shared/shared.module';
+
 @Global() // Make the module global
 @Module({
   imports: [
     PrismaModule,
+    SharedModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -35,8 +37,8 @@ import { Transport } from '@nestjs/microservices';
       },
     ]),
   ],
-  providers: [AuthService, JwtStrategy, Logger, PrismaService, MailService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtStrategy, Logger, RolesGuard],
+  exports: [AuthService, JwtModule, RolesGuard],
   controllers: [AuthController],
 })
 export class AuthModule {}
