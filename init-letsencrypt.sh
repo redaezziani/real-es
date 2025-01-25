@@ -1,38 +1,38 @@
+#!/usr/bin/env bash
 
-#!/bin/bash
-
-domains=(redaezziani.com www.redaezziani.com)
+domain1="redaezziani.com"
+domain2="www.redaezziani.com"
 email="klausdev2@email.com"
-staging=0 # Set to 1 if you want to test with staging certificates
+staging=0 
 
 data_path="./certbot"
 rsa_key_size=4096
 
-if [ -d "$data_path" ]; then
-  read -p "Existing data found. Continue and replace existing certificate? (y/N) " decision
-  if [ "$decision" != "Y" ] && [ "$decision" != "y" ]; then
-    exit
-  fi
-fi
-
-mkdir -p "$data_path/conf/live/$domains"
+# Make sure data path exists
+mkdir -p "$data_path/conf/live/$domain1"
 mkdir -p "$data_path/www"
 
-echo "Creating dummy certificate..."
+echo "Creating dummy certificate for $domain1"
 openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1\
-  -keyout "$data_path/conf/live/$domains/privkey.pem" \
-  -out "$data_path/conf/live/$domains/fullchain.pem" \
+  -keyout "$data_path/conf/live/$domain1/privkey.pem" \
+  -out "$data_path/conf/live/$domain1/fullchain.pem" \
   -subj "/CN=localhost"
 
 echo "Starting nginx..."
 docker-compose up --force-recreate -d nginx
 
 echo "Removing dummy certificate..."
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/live/$domains
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/archive/$domains
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/renewal/$domains.conf
+docker-compose run --rm certbot rm -Rf /etc/letsencrypt/live/$domain1
+docker-compose run --rm certbot rm -Rf /etc/letsencrypt/archive/$domain1
+docker-compose run --rm certbot rm -Rf /etc/letsencrypt/renewal/$domain1.conf
 
 echo "Requesting Let's Encrypt certificate..."
+if [ $staging != "0" ]; then
+  staging_arg="--staging"
+else
+  staging_arg=""
+fi
+
 docker-compose run --rm certbot certonly \
   --webroot \
   --webroot-path /var/www/certbot \
@@ -40,8 +40,9 @@ docker-compose run --rm certbot certonly \
   --agree-tos \
   --no-eff-email \
   --force-renewal \
-  ${staging:+"--staging"} \
-  ${domains[@]/#/-d }
+  $staging_arg \
+  -d $domain1 \
+  -d $domain2
 
 echo "Reloading nginx..."
 docker-compose exec nginx nginx -s reload
