@@ -22,7 +22,7 @@ export class AresScraperRepository implements IScraper {
       const url = `https://fl-ares.com/${mangaSlug}-chapter-${chapterNumber}/`;
 
       const browser = await puppeteer.launch({
-        headless: false,
+        headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
 

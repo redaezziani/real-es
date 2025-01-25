@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; // Fix import path
+import { PrismaService } from '../prisma/prisma.service'; 
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
@@ -56,6 +56,7 @@ export class AuthService {
       user: {
         email: user.email,
         name: user.name,
+        profile: user.profile.image || null,
       },
       access_token,
     };
@@ -136,7 +137,10 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.users.findUnique({ where: { email } });
+    const user = await this.prisma.users.findUnique({
+      where: { email },
+      include: { profile: true },
+    });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       return user;

@@ -1,22 +1,15 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Redis } from 'ioredis';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Redis } from '@upstash/redis';
+import { secrets } from 'src/config/secrets';
 
 @Injectable()
-export class RedisService implements OnModuleInit, OnModuleDestroy {
+export class RedisService implements OnModuleInit {
   private redisClient: Redis;
 
   async onModuleInit() {
     this.redisClient = new Redis({
-      host: 'localhost', // Use the hostname of your Redis server
-      port: 6379, // Default Redis port
-    });
-
-    this.redisClient.on('connect', () => {
-      console.log('Connected to Redis');
-    });
-
-    this.redisClient.on('error', (err) => {
-      console.error('Redis error:', err);
+      url: secrets.redis.url,
+      token: secrets.redis.token,
     });
   }
 
@@ -31,15 +24,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async del(key: string): Promise<number> {
     return this.redisClient.del(key);
   }
+
   async expire(key: string, seconds: number): Promise<void> {
     await this.redisClient.expire(key, seconds);
   }
 
   async clearAll(): Promise<void> {
-    await this.redisClient.flushall();
-  }
-
-  async onModuleDestroy() {
-    await this.redisClient.quit();
+    console.warn('clearAll not implemented for Upstash Redis');
   }
 }

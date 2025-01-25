@@ -9,6 +9,7 @@ import { AresScraperRepository } from './repository/ares.repository';
 import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import { ScraperController } from './scraper.controller';
+import { secrets } from 'src/config/secrets';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { ScraperController } from './scraper.controller';
         name: 'manga_service',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://admin:adminpassword@localhost:5672'],
+          urls: [secrets.rabbitmq.url],
           queue: 'manga_queue',
           queueOptions: {
             durable: true,

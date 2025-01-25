@@ -5,7 +5,7 @@ import { VersioningType, ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
 import { Transport } from '@nestjs/microservices';
 import * as logger from 'morgan';
-
+import { secrets } from './config/secrets';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
@@ -20,7 +20,7 @@ async function bootstrap() {
   const microservice = app.connectMicroservice({
     transport: Transport.RMQ,
     options: {
-      urls: ['amqp://admin:adminpassword@localhost:5672'],
+      urls: [secrets.rabbitmq.url],
       queue: 'manga_queue',
       prefetchCount: 1,
       persistent: true,
@@ -94,7 +94,6 @@ async function bootstrap() {
     }),
   );
 
-  //   await app.startAllMicroservices();
-  await app.listen(process.env.PORT ?? 8000);
+  await app.listen(secrets.app.port);
 }
 bootstrap();

@@ -5,6 +5,7 @@ import { MangaController } from './manga.controller';
 import { RedisService } from 'src/redis/redis.service';
 import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
+import { secrets } from 'src/config/secrets';
 @Module({
   imports: [
     ClientsModule.register([
@@ -12,7 +13,7 @@ import { Transport } from '@nestjs/microservices';
         name: 'manga_service',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://admin:adminpassword@localhost:5672'],
+          urls: [secrets.rabbitmq.url],
           queue: 'manga_queue',
           queueOptions: {
             durable: true,
