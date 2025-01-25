@@ -136,7 +136,11 @@ export class MangaService implements IManga {
           OR: [{ id }, { slug: id }],
         },
         include: {
-          chapters: true,
+          chapters: {
+            orderBy: {
+              number: 'desc',
+            },
+          },
         },
       });
       if (!manga) {
@@ -321,7 +325,7 @@ export class MangaService implements IManga {
   }
   async getStatus(): Promise<string[]> {
     try {
-      // cache key
+      
       const cacheKey = `status`;
       const cachedResults = await this.redisService.get(cacheKey);
       if (cachedResults) {

@@ -148,6 +148,16 @@ export class ScraperService {
         }
       }
 
+      const existChapter = await this.prismaService.chapter.findMany({
+        where: {
+          mangaId: mangaId,
+          number: parseInt(chapterNumber, 10),
+        },
+      });
+      if (existChapter.length > 0) {
+        throw new BadRequestException('Alredy exist Chapter ');
+      }
+
       const chapter = await this.prismaService.chapter.create({
         data: {
           number: parseInt(chapterNumber, 10),
@@ -173,6 +183,7 @@ export class ScraperService {
 
       // get all the admins then send to theme
 
+      console.log('chapter', chapter);
       const admins = await this.prismaService.profiles.findMany({
         where: {
           role: {
@@ -234,6 +245,7 @@ export class ScraperService {
     try {
       new URL(page);
     } catch (error: any) {
+      console.log(error);
       throw new BadRequestException(`Invalid page URL: ${page}`);
     }
 
