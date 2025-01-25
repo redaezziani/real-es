@@ -6,46 +6,46 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nestjs-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+      - RABBITMQ_URL=${RABBITMQ_URL}
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
     ports:
-      - "3000:3000"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
     depends_on:
-      - postgres
-      - rabbitmq
-    environment:
-      - DATABASE_URL=postgresql://user:password@postgres:5432/dbname
-      - RABBITMQ_URL=amqp://user:password@rabbitmq:5672
-      - UPSTASH_REDIS_URL=https://your-url.upstash.io
-      - UPSTASH_REDIS_TOKEN=your_token
+      - app
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    networks:
+      - app-network
     restart: unless-stopped
 
-  postgres:
-    image: postgres:latest
-    container_name: postgres-db
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=dbname
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq-broker
-    ports:
-      - "5672:5672"   # AMQP protocol port
-      - "15672:15672" # Management interface port
-    environment:
-      - RABBITMQ_DEFAULT_USER=user
-      - RABBITMQ_DEFAULT_PASS=password
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    restart: unless-stopped
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - app-network
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
-  postgres-data:
-    driver: local
-  rabbitmq-data:
+  certbot-data:
     driver: local
