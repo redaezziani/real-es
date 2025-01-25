@@ -4,7 +4,7 @@
 DOMAIN_MAIN="redaezziani.com"
 DOMAIN_WWW="www.redaezziani.com"
 EMAIL="klausdev2@email.com" 
-STAGING=1  # Set to 0 for production certificates
+STAGING=0  # Set to 0 for production certificates
 DATA_PATH="./certbot"
 RSA_KEY_SIZE=4096
 
@@ -46,6 +46,9 @@ log "Creating directories..."
 mkdir -p "$DATA_PATH/conf/live/$DOMAIN_MAIN"
 mkdir -p "$DATA_PATH/www"
 
+# Stop existing containers
+docker-compose down
+
 log "Creating dummy certificate..."
 openssl req -x509 -nodes -newkey rsa:$RSA_KEY_SIZE -days 1 \
     -keyout "$DATA_PATH/conf/live/$DOMAIN_MAIN/privkey.pem" \
@@ -54,6 +57,10 @@ openssl req -x509 -nodes -newkey rsa:$RSA_KEY_SIZE -days 1 \
 
 log "Starting nginx..."
 docker-compose up --force-recreate -d nginx
+
+# Wait for nginx to start
+echo "Waiting for nginx to start..."
+sleep 5
 
 log "Removing dummy certificate..."
 docker-compose run --rm --entrypoint "\
@@ -78,6 +85,24 @@ docker-compose run --rm --entrypoint "\
     --rsa-key-size $RSA_KEY_SIZE \
     --agree-tos \
     --force-renewal" certbot
+
+# Check if certificate was obtained successfully
+if [ -d "$DATA_PATH/conf/live/$DOMAIN_MAIN" ]; then
+    echo "Certificate obtained successfully!"
+    
+    # Uncomment HTTPS server block in nginx config
+    sed -i 's/#server {/server {/' nginx/app.conf
+    sed -i 's/#    listen/    listen/' nginx/app.conf
+    sed -i 's/#    ssl_certificate/    ssl_certificate/' nginx/app.conf
+    sed -i 's/#    location/    location/' nginx/app.conf
+    sed -i 's/#    proxy_pass/    proxy_pass/' nginx/app.conf
+    
+    # Restart nginx to apply new configuration
+    docker-compose restart nginx
+else
+    echo "Failed to obtain certificate"
+    exit 1
+fi
 
 log "Reloading nginx..."
 docker-compose exec nginx nginx -s reload
