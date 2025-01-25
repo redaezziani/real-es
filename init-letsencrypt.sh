@@ -1,48 +1,49 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-domain1="redaezziani.com"
-domain2="www.redaezziani.com"
-email="klausdev2@email.com"
-staging=0 
+# Domain names for certificate
+DOMAIN_MAIN="redaezziani.com"
+DOMAIN_WWW="www.redaezziani.com"
+EMAIL="klausdev2@email.com"
+STAGING=0
 
-data_path="./certbot"
-rsa_key_size=4096
+DATA_PATH="./certbot"
+RSA_KEY_SIZE=4096
 
-# Make sure data path exists
-mkdir -p "$data_path/conf/live/$domain1"
-mkdir -p "$data_path/www"
+echo "Creating directories..."
+mkdir -p "$DATA_PATH/conf/live/$DOMAIN_MAIN"
+mkdir -p "$DATA_PATH/www"
 
-echo "Creating dummy certificate for $domain1"
-openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1\
-  -keyout "$data_path/conf/live/$domain1/privkey.pem" \
-  -out "$data_path/conf/live/$domain1/fullchain.pem" \
+echo "Creating dummy certificate for $DOMAIN_MAIN..."
+openssl req -x509 -nodes -newkey rsa:$RSA_KEY_SIZE -days 1 \
+  -keyout "$DATA_PATH/conf/live/$DOMAIN_MAIN/privkey.pem" \
+  -out "$DATA_PATH/conf/live/$DOMAIN_MAIN/fullchain.pem" \
   -subj "/CN=localhost"
 
 echo "Starting nginx..."
 docker-compose up --force-recreate -d nginx
 
 echo "Removing dummy certificate..."
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/live/$domain1
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/archive/$domain1
-docker-compose run --rm certbot rm -Rf /etc/letsencrypt/renewal/$domain1.conf
+docker-compose run --rm --entrypoint "\
+  rm -rf /etc/letsencrypt/live/$DOMAIN_MAIN && \
+  rm -rf /etc/letsencrypt/archive/$DOMAIN_MAIN && \
+  rm -rf /etc/letsencrypt/renewal/$DOMAIN_MAIN.conf" certbot
 
 echo "Requesting Let's Encrypt certificate..."
-if [ $staging != "0" ]; then
-  staging_arg="--staging"
+if [ "$STAGING" = "1" ]; then
+  STAGING_ARG="--staging"
 else
-  staging_arg=""
+  STAGING_ARG=""
 fi
 
-docker-compose run --rm certbot certonly \
-  --webroot \
-  --webroot-path /var/www/certbot \
-  --email $email \
-  --agree-tos \
-  --no-eff-email \
-  --force-renewal \
-  $staging_arg \
-  -d $domain1 \
-  -d $domain2
+docker-compose run --rm --entrypoint "\
+  certbot certonly --webroot -w /var/www/certbot \
+    $STAGING_ARG \
+    --email $EMAIL \
+    --agree-tos \
+    --no-eff-email \
+    --force-renewal \
+    -d $DOMAIN_MAIN \
+    -d $DOMAIN_WWW" certbot
 
 echo "Reloading nginx..."
 docker-compose exec nginx nginx -s reload
