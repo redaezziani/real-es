@@ -81,10 +81,10 @@ export class ScraperService {
       });
 
       const clients = await this.prismaService.profiles.findMany({
-        where: { 
+        where: {
           role: {
-            name: 'USER'
-          }
+            name: 'USER',
+          },
         },
         select: { userId: true },
       });
@@ -107,6 +107,7 @@ export class ScraperService {
 
       return manga;
     } catch (error) {
+      console.log(error);
       if (error instanceof BadRequestException) {
         throw error;
       }

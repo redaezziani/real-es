@@ -179,7 +179,7 @@ model Page {
     image     String
     chapterId String
     createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    updatedAt DateTime @default(now())
     chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
 
@@ -213,4 +213,17 @@ model Notification {
 
     @@index([recipientId, status])
     @@index([type])
+}
+
+model EmailSubscription {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  isActive  Boolean   @default(true)
+  topics    String[]  @default([])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastSentAt DateTime?
+
+  @@index([email])
+  @@index([isActive])
 }

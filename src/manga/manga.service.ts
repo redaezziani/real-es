@@ -139,7 +139,6 @@ export class MangaService implements IManga {
           chapters: true,
         },
       });
-      // if manga is not found
       if (!manga) {
         return {
           success: false,

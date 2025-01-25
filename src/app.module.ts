@@ -15,7 +15,7 @@ import { MangaModule } from './manga/manga.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
-
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -33,6 +33,7 @@ import { PermissionsModule } from './permissions/permissions.module';
     NotificationsModule,
     RolesModule,
     PermissionsModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController],
   providers: [
