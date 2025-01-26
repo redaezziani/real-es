@@ -42,7 +42,16 @@ services:
     volumes:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
-    command: certonly --webroot -w /var/www/certbot --force-renewal --email klausdev2@email.com -d redaezziani.com -d www.redaezziani.com --agree-tos --no-eff-email
+    command: >
+      certonly --webroot 
+      -w /var/www/certbot 
+      --staging
+      --force-renewal 
+      --email klausdev2@email.com 
+      -d redaezziani.com 
+      -d www.redaezziani.com 
+      --agree-tos 
+      --no-eff-email
 
 networks:
   app-network:
