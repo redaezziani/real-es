@@ -5,59 +5,81 @@ DOMAIN_MAIN="redaezziani.com"
 DOMAIN_WWW="www.redaezziani.com"
 EMAIL="klausdev2@email.com"
 DATA_PATH="./certbot"
-
-# Rate limit check
 RATE_LIMIT_FILE="$DATA_PATH/.ratelimit"
-CURRENT_TIME=$(date +%s)
-WAIT_TIME=604800  # 7 days in seconds
 
-# Colors for output
+# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log() {
-    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"
-}
-
-error() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
-}
+log() { echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"; }
+warn() { echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}"; }
+error() { echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"; }
 
 check_rate_limit() {
     if [ -f "$RATE_LIMIT_FILE" ]; then
-        LAST_REQUEST=$(cat "$RATE_LIMIT_FILE")
-        TIME_DIFF=$((CURRENT_TIME - LAST_REQUEST))
+        local target_time=$(cat "$RATE_LIMIT_FILE")
+        local current_time=$(date +%s)
         
-        if [ $TIME_DIFF -lt $WAIT_TIME ]; then
-            WAIT_HOURS=$(( (WAIT_TIME - TIME_DIFF) / 3600 ))
-            error "Rate limit in effect. Please wait $WAIT_HOURS hours before requesting new certificates"
+        if [ $current_time -lt $target_time ]; then
+            local wait_hours=$(( ($target_time - $current_time) / 3600 ))
+            local wait_minutes=$(( ($target_time - $current_time) % 3600 / 60 ))
+            warn "Rate limit active. Wait ${wait_hours}h ${wait_minutes}m before requesting new certificates"
+            warn "Rate limit expires: $(date -d @${target_time})"
             return 1
         fi
     fi
     return 0
 }
 
-# Clean up
-log "Cleaning up previous installation..."
-docker-compose down -v
-rm -rf "$DATA_PATH"
-mkdir -p "$DATA_PATH/conf/live/$DOMAIN_MAIN" "$DATA_PATH/www"
+update_rate_limit() {
+    # Set next allowed request time to 7 days from now
+    echo $(( $(date +%s) + 604800 )) > "$RATE_LIMIT_FILE"
+}
 
-# Check rate limit
+verify_dns() {
+    local domain=$1
+    log "Verifying DNS for $domain..."
+    
+    # Get current IP
+    local current_ip=$(curl -s ifconfig.me)
+    local dns_ip=$(dig +short $domain)
+
+    if [ "$dns_ip" = "$current_ip" ]; then
+        log "DNS verified for $domain: $dns_ip"
+        return 0
+    else
+        error "DNS mismatch for $domain:"
+        error "Expected: $current_ip"
+        error "Got: $dns_ip"
+        return 1
+    fi
+}
+
+# Initial checks
 if ! check_rate_limit; then
-    log "Using existing certificates if available..."
-    if [ -f "$DATA_PATH/conf/live/$DOMAIN_MAIN/fullchain.pem" ]; then
+    if [ -d "$DATA_PATH/conf/live/$DOMAIN_MAIN" ]; then
+        log "Using existing certificates..."
         docker-compose up -d
         exit 0
-    else
-        error "No existing certificates found. Please wait for rate limit to expire."
-        exit 1
     fi
+    error "No existing certificates and rate limit is active"
+    exit 1
 fi
 
-# Create initial nginx config for HTTP challenge
-log "Creating initial nginx configuration..."
+# Verify DNS before proceeding
+if ! verify_dns $DOMAIN_MAIN || ! verify_dns $DOMAIN_WWW; then
+    error "DNS verification failed. Please check your DNS settings"
+    exit 1
+fi
+
+# Clean up and prepare
+log "Preparing environment..."
+mkdir -p "$DATA_PATH/conf/live/$DOMAIN_MAIN" "$DATA_PATH/www"
+
+# Start with minimal nginx config
+log "Configuring nginx..."
 cat > nginx/app.conf << EOF
 server {
     listen 80;
@@ -68,66 +90,51 @@ server {
         root /var/www/certbot;
         try_files \$uri =404;
     }
+
+    location / {
+        return 200 'SSL Setup in Progress';
+    }
 }
 EOF
 
 # Start nginx
 log "Starting nginx..."
 docker-compose up -d nginx
-sleep 10
-
-# Start with staging
-log "Requesting staging certificate first..."
-docker-compose up -d nginx
 sleep 5
 
+# Request staging certificate
+log "Testing with staging certificate..."
 docker-compose run --rm --entrypoint "\
     certbot certonly --webroot -w /var/www/certbot \
     --staging \
     --email $EMAIL \
     --agree-tos \
     --no-eff-email \
-    -d $DOMAIN_MAIN -d $DOMAIN_WWW \
-    --cert-name $DOMAIN_MAIN" certbot
+    -d $DOMAIN_MAIN -d $DOMAIN_WWW" certbot
 
 if [ $? -eq 0 ]; then
-    log "Staging certificate successful, proceeding with production certificate..."
-    rm -rf "$DATA_PATH/conf/live/$DOMAIN_MAIN"
+    log "Staging successful, proceeding with production..."
+    rm -rf "$DATA_PATH/conf/live/$DOMAIN_MAIN"*
     
-    # Record certificate request time
-    echo $CURRENT_TIME > "$RATE_LIMIT_FILE"
+    update_rate_limit
     
     docker-compose run --rm --entrypoint "\
         certbot certonly --webroot -w /var/www/certbot \
         --email $EMAIL \
         --agree-tos \
         --no-eff-email \
-        -d $DOMAIN_MAIN -d $DOMAIN_WWW \
-        --cert-name $DOMAIN_MAIN" certbot
-        
+        -d $DOMAIN_MAIN -d $DOMAIN_WWW" certbot
+    
     if [ $? -eq 0 ]; then
-        log "Production certificate obtained successfully!"
+        log "Certificates obtained successfully!"
+        docker-compose down
         docker-compose up -d
+        log "Setup complete! Visit https://$DOMAIN_MAIN"
     else
-        error "Failed to obtain production certificate"
+        error "Production certificate failed"
         exit 1
     fi
 else
     error "Staging certificate failed"
-    exit 1
-fi
-
-# Verify production certificate exists
-if [ -d "$DATA_PATH/conf/live/$DOMAIN_MAIN" ]; then
-    log "Certificate obtained successfully!"
-    docker-compose down
-    
-    # Start all services
-    log "Starting all services..."
-    docker-compose up -d
-    
-    log "Done! Check https://$DOMAIN_MAIN"
-else
-    error "Failed to obtain certificate"
     exit 1
 fi
