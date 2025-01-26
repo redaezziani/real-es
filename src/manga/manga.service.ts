@@ -15,6 +15,8 @@ import { ChapterPageDto } from './dtos/chapter-pages.dto';
 
 @Injectable()
 export class MangaService implements IManga {
+  private readonly CACHE_TTL = 3600; // 1 hour in seconds
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
@@ -325,35 +327,27 @@ export class MangaService implements IManga {
   }
   async getStatus(): Promise<string[]> {
     try {
-      const cacheKey = 'status';
-      let cachedResults = await this.redisService.get(cacheKey);
+      const cacheKey = 'manga:status:list';
+      const cachedData = await this.redisService.get(cacheKey);
 
-      // Try to parse JSON only if we have cached results
-      let parsedResults: string[] | null = null;
-      if (cachedResults) {
+      if (cachedData) {
         try {
-          parsedResults = JSON.parse(cachedResults);
+          return JSON.parse(cachedData);
         } catch (e) {
-          console.warn('Invalid cached status, fetching fresh data');
+          console.warn('Invalid cached status data, fetching fresh data');
         }
       }
 
-      if (parsedResults) {
-        return parsedResults;
-      }
-
       const status = await this.prismaService.manga.findMany({
-        select: {
-          status: true,
-        },
+        select: { status: true },
       });
 
-      const uniqueStatus = [
-        ...new Set(status.map((manga) => manga.status)),
-      ].filter((status) => status !== null);
+      const uniqueStatus = [...new Set(status.map((m) => m.status))]
+        .filter(Boolean)
+        .sort();
 
-      // Ensure proper JSON stringification
       await this.redisService.set(cacheKey, JSON.stringify(uniqueStatus));
+      await this.redisService.expire(cacheKey, this.CACHE_TTL);
 
       return uniqueStatus;
     } catch (error) {
@@ -364,35 +358,27 @@ export class MangaService implements IManga {
 
   async getGenres(): Promise<string[]> {
     try {
-      const cacheKey = 'genres';
-      let cachedResults = await this.redisService.get(cacheKey);
+      const cacheKey = 'manga:genres:list';
+      const cachedData = await this.redisService.get(cacheKey);
 
-      // Try to parse JSON only if we have cached results
-      let parsedResults: string[] | null = null;
-      if (cachedResults) {
+      if (cachedData) {
         try {
-          parsedResults = JSON.parse(cachedResults);
+          return JSON.parse(cachedData);
         } catch (e) {
-          console.warn('Invalid cached genres, fetching fresh data');
+          console.warn('Invalid cached genres data, fetching fresh data');
         }
       }
 
-      if (parsedResults) {
-        return parsedResults;
-      }
-
       const genres = await this.prismaService.manga.findMany({
-        select: {
-          genres: true,
-        },
+        select: { genres: true },
       });
 
-      const uniqueGenres = [
-        ...new Set(genres.flatMap((manga) => manga.genres)),
-      ];
+      const uniqueGenres = [...new Set(genres.flatMap((m) => m.genres))]
+        .filter(Boolean)
+        .sort();
 
-      // Ensure proper JSON stringification
       await this.redisService.set(cacheKey, JSON.stringify(uniqueGenres));
+      await this.redisService.expire(cacheKey, this.CACHE_TTL);
 
       return uniqueGenres;
     } catch (error) {
@@ -400,17 +386,30 @@ export class MangaService implements IManga {
       throw new Error(`Failed to fetch genres: ${error.message}`);
     }
   }
+
   async getTypes(): Promise<string[]> {
     try {
+      const cacheKey = 'manga:types:list';
+      const cachedData = await this.redisService.get(cacheKey);
+
+      if (cachedData) {
+        try {
+          return JSON.parse(cachedData);
+        } catch (e) {
+          console.warn('Invalid cached types data, fetching fresh data');
+        }
+      }
+
       const types = await this.prismaService.manga.findMany({
-        select: {
-          type: true,
-        },
+        select: { type: true },
       });
 
-      const uniqueTypes = [...new Set(types.map((manga) => manga.type))].filter(
-        (type) => type !== null,
-      );
+      const uniqueTypes = [...new Set(types.map((m) => m.type))]
+        .filter(Boolean)
+        .sort();
+
+      await this.redisService.set(cacheKey, JSON.stringify(uniqueTypes));
+      await this.redisService.expire(cacheKey, this.CACHE_TTL);
 
       return uniqueTypes;
     } catch (error) {
