@@ -9,6 +9,23 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 log() { echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}"; }
 
+# Verify DNS records
+check_dns() {
+    log "Verifying DNS records..."
+    local ip=$(curl -s ifconfig.me)
+    local domain_ip=$(dig +short $DOMAIN)
+    local www_ip=$(dig +short www.$DOMAIN)
+
+    if [ "$domain_ip" != "$ip" ] || [ "$www_ip" != "$ip" ]; then
+        log "DNS verification failed!"
+        log "Expected IP: $ip"
+        log "Got: Domain IP=$domain_ip, WWW IP=$www_ip"
+        return 1
+    fi
+    log "DNS verification successful"
+    return 0
+}
+
 # Stop everything
 log "Stopping all services..."
 docker-compose down
@@ -18,10 +35,16 @@ log "Cleaning up old certificates..."
 sudo rm -rf ./certbot
 mkdir -p ./certbot/www ./certbot/conf
 
+# Check DNS before proceeding
+if ! check_dns; then
+    log "Please update your DNS records and try again"
+    exit 1
+fi
+
 # Start nginx
 log "Starting nginx..."
 docker-compose up -d nginx
-sleep 5
+sleep 10
 
 # Get certificate
 log "Requesting certificate..."
