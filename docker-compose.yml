@@ -30,6 +30,7 @@ services:
       - ./nginx:/etc/nginx/conf.d
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
+      - ./ssl:/etc/nginx/ssl
     depends_on:
       - app
     networks:
@@ -37,21 +38,13 @@ services:
     restart: unless-stopped
 
   certbot:
-    image: certbot/certbot:latest
+    image: certbot/certbot
     container_name: certbot
     volumes:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
-    command: >
-      certonly --webroot 
-      -w /var/www/certbot 
-      --staging
-      --force-renewal 
-      --email klausdev2@email.com 
-      -d redaezziani.com 
-      -d www.redaezziani.com 
-      --agree-tos 
-      --no-eff-email
+    depends_on:
+      - nginx
 
 networks:
   app-network:
