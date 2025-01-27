@@ -7,6 +7,88 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+enum NotificationStatus {
+    PENDING
+    SENT
+    FAILED
+    READ
+}
+
+enum NotificationPriority {
+    LOW
+    MEDIUM
+    HIGH
+    URGENT
+}
+
+enum HttpMethod {
+    GET
+    POST
+    PUT
+    DELETE
+    PATCH
+}
+
+model Role {
+    id          String           @id @default(uuid())
+    name        String           @unique
+    description String?
+    createdAt   DateTime         @default(now())
+    updatedAt   DateTime         @updatedAt
+    permissions RolePermission[]
+    profiles    Profiles[]
+}
+
+model Permission {
+    id              String           @id @default(uuid())
+    resource        String
+    method          HttpMethod
+    path            String
+    description     String?
+    createdAt       DateTime         @default(now())
+    updatedAt       DateTime         @updatedAt
+    rolePermissions RolePermission[]
+
+    @@unique([resource, method, path])
+}
+
+model RolePermission {
+    id           String     @id @default(uuid())
+    roleId       String
+    permissionId String
+    role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+    @@unique([roleId, permissionId])
+}
+
+// Update Profiles model to use Role
+model Profiles {
+    id     String  @id @default(uuid())
+    bio    String?
+    phone  String?
+    image  String?
+    userId String  @unique
+    roleId String
+    role   Role    @relation(fields: [roleId], references: [id])
+    user   Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    badge  badge   @default(UNVERIFIED)
+
+    @@index([userId])
+    @@index([roleId])
+}
+
+// Existing models remain the same
+enum roles {
+    ADMIN
+    USER
+}
+
+enum badge {
+    VERIFIED
+    UNVERIFIED
+}
+
 model Users {
     id                        String                     @id @default(uuid())
     name                      String
@@ -22,6 +104,8 @@ model Users {
     emailVerificationRequests EmailVerificationRequest[]
     passwordResetRequests     PasswordResetRequest[]
     profile                   Profiles?
+    NotificationPreference    NotificationPreference?
+    Notification              Notification[]
 }
 
 model EmailVerificationRequest {
@@ -48,77 +132,98 @@ model PasswordResetRequest {
     @@index([token])
 }
 
-enum roles {
-    ADMIN
-    USER
+enum ScraperPlatform {
+    ASHEQ
+    ARES
 }
 
-enum badge {
-    VERIFIED
-    UNVERIFIED
+model Manga {
+    id             String          @id @default(uuid())
+    title          String
+    slug           String?         @unique
+    rating         Float           @default(0)
+    coverThumbnail String?
+    otherTitles    String[]
+    description    String
+    cover          String
+    authors        String[]
+    artists        String[]
+    platform       ScraperPlatform @default(ASHEQ)
+    type           String
+    releaseDate    DateTime
+    status         String
+    genres         String[]
+    views          Int             @default(0)
+    createdAt      DateTime        @default(now())
+    updatedAt      DateTime        @updatedAt
+    chapters       Chapter[]
 }
 
-model Profiles {
-    id         String       @id @default(uuid())
-    bio        String?
-    phone      String?
-    image      String?
-    userId     String       @unique
-    role       roles        @default(USER)
-    user       Users        @relation(fields: [userId], references: [id], onDelete: Cascade)
-    properties Properties[]
-    badge      badge        @default(UNVERIFIED)
-
-    @@index([userId])
+model Chapter {
+    id          String   @id @default(uuid())
+    title       String
+    slug        String?  @unique
+    number      Int
+    releaseDate DateTime
+    mangaId     String
+    views       Int      @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+    pages       Page[]
 }
 
-enum status {
-    PENDING
-    APPROVED
-    REJECTED
-    SOLD
+model Page {
+    id        String   @id @default(uuid())
+    number    Int
+    image     String
+    chapterId String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+    chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
 
-enum propertyType {
-    APARTMENT
-    HOUSE
-    LAND
-    COMMERCIAL
+model NotificationPreference {
+    id           String   @id @default(uuid())
+    userId       String   @unique
+    emailEnabled Boolean  @default(true)
+    pushEnabled  Boolean  @default(true)
+    inAppEnabled Boolean  @default(true)
+    categories   String[] @default([])
+    user         Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 }
 
-enum currency {
-    USD // United States Dollar
-    EUR // Euro
-    GBP // British Pound
-    DH // Moroccan Dirham
+model Notification {
+    id          String               @id @default(uuid())
+    type        String
+    title       String
+    message     String
+    data        Json?
+    channels    String[]
+    status      NotificationStatus   @default(PENDING)
+    priority    NotificationPriority @default(MEDIUM)
+    recipientId String?
+    recipient   Users?               @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+    readAt      DateTime?
+    sentAt      DateTime?
+    createdAt   DateTime             @default(now())
+    updatedAt   DateTime             @updatedAt
+
+    @@index([recipientId, status])
+    @@index([type])
 }
 
-model Properties {
-    id          String             @id @default(uuid())
-    name        String
-    description String
-    price       Float
-    profileId   String
-    rate        Float
-    location    String
-    currency    currency
-    type        propertyType
-    status      status             @default(PENDING)
-    profile     Profiles           @relation(fields: [profileId], references: [id], onDelete: Cascade)
-    images      PropertiesImages[]
-    createdAt   DateTime           @default(now())
-    updatedAt   DateTime           @updatedAt
+model EmailSubscription {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  isActive  Boolean   @default(true)
+  topics    String[]  @default([])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastSentAt DateTime?
 
-    @@index([profileId])
-}
-
-model PropertiesImages {
-    id         String     @id @default(uuid())
-    url        String
-    propertyId String
-    property   Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-    createdAt  DateTime   @default(now())
-    updatedAt  DateTime   @updatedAt
-
-    @@index([propertyId])
+  @@index([email])
+  @@index([isActive])
 }

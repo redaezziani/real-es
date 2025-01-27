@@ -7,7 +7,7 @@ export class LoginDto {
     example: 'user@example.com',
     type: String,
   })
-  @IsEmail({}, { message: 'Invalid email address' })
+  @IsEmail({}, { message: 'عنوان البريد الإلكتروني غير صالح' })
   email: string;
 
   @ApiProperty({
@@ -16,8 +16,8 @@ export class LoginDto {
     type: String,
     minLength: 8,
   })
-  @IsNotEmpty({ message: 'Password should not be empty' })
-  @IsString({ message: 'Password must be a string' })
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  @IsNotEmpty({ message: 'يجب ألا تكون كلمة المرور فارغة' })
+  @IsString({ message: 'يجب أن تكون كلمة المرور نصية' })
+  @MinLength(8, { message: 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل' })
   password: string;
 }

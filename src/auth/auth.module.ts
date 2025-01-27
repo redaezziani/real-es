@@ -1,32 +1,44 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module, Global } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
-import { PrismaService } from 'src/shared/prisma.service';
-import { JwtStrategy } from './strategies/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailService } from 'src/shared/mail.service';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuthController } from './auth.controller';
+import { ClientsModule } from '@nestjs/microservices';
+import { Transport } from '@nestjs/microservices';
+import { RolesGuard } from './guards/roles.guard';
+import { SharedModule } from '../shared/shared.module';
+
+@Global() // Make the module global
 @Module({
   imports: [
-    PassportModule,
+    PrismaModule,
+    SharedModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: config.get<string>('JWT_EXPIRATION') },
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '24h' },
       }),
+      inject: [ConfigService],
     }),
+    ClientsModule.register([
+      {
+        name: 'manga_service',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://admin:adminpassword@localhost:5672'],
+          queue: 'manga_queue',
+          queueOptions: {
+            durable: true,
+          },
+        },
+      },
+    ]),
   ],
+  providers: [AuthService, JwtStrategy, Logger, RolesGuard],
+  exports: [AuthService, JwtModule, RolesGuard],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    PrismaService,
-    JwtStrategy,
-    MailService,
-    ConfigService,
-  ],
-  exports: [AuthService],
 })
 export class AuthModule {}

@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from 'src/shared/prisma.service';
+import { PrismaService } from '../prisma/prisma.service'; 
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
@@ -19,7 +19,10 @@ export class AuthService {
   async register(registerDto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const verificationToken = this.generateToken();
+    const verificationToken = this.generateToken({
+      sub: registerDto.email,
+      type: 'email-verification',
+    });
 
     const user = await this.prisma.users.create({
       data: {
@@ -33,21 +36,29 @@ export class AuthService {
     await this.mailService.sendVerificationEmail(user.email, verificationToken);
 
     return {
-      message: 'Registration successful. Check your email for verification.',
+      message: 'تم التسجيل بنجاح. تحقق من بريدك الإلكتروني للتحقق من حسابك',
     };
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.prisma.users.findUnique({
-      where: { email: loginDto.email },
-    });
+    const { email, password } = loginDto;
+    const user = await this.validateUser(email, password);
 
-    if (!user || !(await bcrypt.compare(loginDto.password, user.password))) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.profile?.role || 'USER',
+    };
+
+    const access_token = this.generateToken(payload);
 
     return {
-      accessToken: this.jwtService.sign({ sub: user.id, email: user.email }),
+      user: {
+        email: user.email,
+        name: user.name,
+        profile: user.profile.image || null,
+      },
+      access_token,
     };
   }
 
@@ -57,7 +68,7 @@ export class AuthService {
     });
 
     if (!user || new Date() > user.verificationTokenExpiry) {
-      throw new UnauthorizedException('Token expired or invalid');
+      throw new UnauthorizedException('رمز التحقق منتهي الصلاحية أو غير صالح');
     }
 
     await this.prisma.users.update({
@@ -68,16 +79,19 @@ export class AuthService {
         verificationTokenExpiry: null,
       },
     });
+
+    return user;
   }
 
   async requestPasswordReset(email: string) {
     const user = await this.prisma.users.findUnique({ where: { email } });
 
     if (!user) {
-      throw new UnauthorizedException('Email not found');
+      throw new UnauthorizedException('البريد الإلكتروني غير موجود');
     }
 
-    const resetToken = this.generateToken();
+    const payload = { sub: user.id, type: 'password-reset' };
+    const resetToken = this.generateToken(payload);
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.prisma.users.update({
@@ -91,7 +105,7 @@ export class AuthService {
     await this.mailService.sendPasswordResetEmail(email, resetToken);
 
     return {
-      message: 'Password reset email sent successfully',
+      message: 'تم إرسال رابط إعادة تعيين كلمة المرور بنجاح',
     };
   }
 
@@ -101,7 +115,9 @@ export class AuthService {
     });
 
     if (!user || new Date() > user.passwordResetExpiry) {
-      throw new UnauthorizedException('Token expired or invalid');
+      throw new UnauthorizedException(
+        'رمز إعادة التعيين منتهي الصلاحية أو غير صالح',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -116,12 +132,15 @@ export class AuthService {
     });
   }
 
-  private generateToken(): string {
-    return [...Array(30)].map(() => Math.random().toString(36)[2]).join('');
+  private generateToken(payload: any): string {
+    return this.jwtService.sign(payload);
   }
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.users.findUnique({ where: { email } });
+    const user = await this.prisma.users.findUnique({
+      where: { email },
+      include: { profile: true },
+    });
 
     if (user && (await bcrypt.compare(password, user.password))) {
       return user;

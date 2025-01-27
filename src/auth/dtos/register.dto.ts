@@ -2,20 +2,20 @@ import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty({
-    message: 'Name should not be empty',
+    message: 'يجب ألا يكون الاسم فارغًا',
   })
   name: string;
 
   @IsEmail(
     {},
     {
-      message: 'Invalid email address',
+      message: 'عنوان البريد الإلكتروني غير صالح',
     },
   )
   email: string;
 
   @MinLength(6, {
-    message: 'Password must be at least 6 characters long',
+    message: 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل',
   })
   password: string;
 }
