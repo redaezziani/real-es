@@ -12,6 +12,7 @@ import {
 } from '../common/types/api-response.type';
 import { PaginationQueryDto } from '../common/dtos/pagination-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
+import { MangaRecommendationService } from './service/manga.recommendation.service';
 
 @Injectable()
 export class MangaService implements IManga {
@@ -20,6 +21,7 @@ export class MangaService implements IManga {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
+    private readonly recommendationService: MangaRecommendationService,
   ) {}
 
   async all(query: MangaQueryDto): Promise<PaginatedResponse<Manga>> {
@@ -131,21 +133,19 @@ export class MangaService implements IManga {
     }
   }
 
-  async byId(id: string): Promise<SingleResponse<Manga>> {
+  async byId(id: string): Promise<SingleResponse<any>> {
     try {
-      const manga = await this.prismaService.manga.findFirst({
-        where: {
-          OR: [{ id }, { slug: id }],
-        },
-        include: {
-          chapters: {
-            orderBy: {
-              number: 'desc',
-            },
+      const [mangaDetails, similarManga] = await Promise.all([
+        this.prismaService.manga.findUnique({
+          where: { id },
+          include: {
+            chapters: true,
           },
-        },
-      });
-      if (!manga) {
+        }),
+        this.recommendationService.getSimilarManga(id, 9),
+      ]);
+
+      if (!mangaDetails) {
         return {
           success: false,
           message: 'Manga not found',
@@ -154,16 +154,19 @@ export class MangaService implements IManga {
       }
       await this.prismaService.manga.update({
         where: {
-          id: manga.id,
+          id: mangaDetails.id,
         },
         data: {
-          views: manga.views + 1,
+          views: mangaDetails.views + 1,
         },
       });
 
       return {
         success: true,
-        data: manga,
+        data: {
+          mangaDetails: mangaDetails,
+          similarManga: similarManga,
+        },
       };
     } catch (error) {
       console.error('Error in byId manga query:', error);
@@ -364,7 +367,7 @@ export class MangaService implements IManga {
       if (cachedData) {
         try {
           return JSON.parse(cachedData);
-        } catch (e) {
+        } catch (e: any) {
           console.warn('Invalid cached genres data, fetching fresh data');
         }
       }

@@ -17,6 +17,7 @@ import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     PermissionsModule,
     SubscriptionsModule,
     UsersModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [

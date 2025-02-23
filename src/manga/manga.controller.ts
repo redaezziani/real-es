@@ -1,5 +1,6 @@
 import { MangaService } from './manga.service';
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -20,7 +21,7 @@ import {
 import { MangaQueryDto } from './dtos/manga-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
 import { GetMangaDto } from './dtos/get-manga';
-import { GetChapterDto } from './dtos/get-chapter';
+import { GetChapterBodyDto, GetChapterQueryDto } from './dtos/get-chapter';
 import { ClientProxy } from '@nestjs/microservices';
 
 @ApiTags('manga')
@@ -186,9 +187,14 @@ export class MangaController {
   }
 
   @Post('chapter')
-  async getChapter(@Query() getChapterDto: GetChapterDto) {
-    // Emit event instead of sending message
-    this.client.emit('scraper.chapter.create', getChapterDto);
+  async getChapter(
+    @Query() query: GetChapterQueryDto,
+    @Body() body: GetChapterBodyDto,
+  ) {
+    this.client.emit('scraper.chapter.create', {
+      mangaId: query.mangaId,
+      chapterNumbers: body.chapterNumbers,
+    });
 
     return {
       statusCode: HttpStatus.ACCEPTED,

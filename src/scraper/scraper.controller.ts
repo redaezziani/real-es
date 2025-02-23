@@ -11,27 +11,21 @@ export class ScraperController {
   @EventPattern('scraper.manga.create')
   async handleMangaCreation(@Payload() getMangaDto: GetMangaDto) {
     try {
-      this.scraperService
-        .getManga(getMangaDto)
-        .then((manga) => {})
-        .catch((error) => {
-          console.error('Error scraping manga:', error);
-        });
+      const res = await this.scraperService.getManga(getMangaDto);
     } catch (error) {
       console.error('Error handling manga creation event:', error);
     }
   }
 
   @EventPattern('scraper.chapter.create')
-  async handleChapterCreation(@Payload() getChapterDto: GetChapterDto) {
+  async handleChapterCreation(@Payload() params: GetChapterDto) {
     try {
-      // Process asynchronously without waiting for response
-      this.scraperService
-        .getChapter(getChapterDto)
-        .then((chapter) => {})
-        .catch((error) => {
-          console.error('Error scraping chapter:', error);
-        });
+      console.log('the params :', params);
+      const { chapterNumbers, mangaId } = params;
+
+      for (const chapterNumber of chapterNumbers) {
+        await this.scraperService.getChapter({ mangaId, chapterNumber });
+      }
     } catch (error) {
       console.error('Error handling chapter creation event:', error);
     }

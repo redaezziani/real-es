@@ -13,9 +13,11 @@ export class AsheqScraperRepository implements IScraper {
   async getManga(title: string): Promise<Manga> {
     const url = `${this.url}/manga/${title}`;
     const html = await this.getHtml(url);
-    return this.getMangaData(html);
+    const data = this.getMangaData(html);
+
+    return data;
   }
-  async getChapter(slug: string, chapterNumber: string): Promise<Chapter> {
+  async getChapter(slug: string, chapterNumber: number): Promise<Chapter> {
     const url = `${this.url}/manga/${slug}/${chapterNumber}`;
     const html = await this.getHtml(url);
     return this.getChapterData(html, chapterNumber);
@@ -29,14 +31,12 @@ export class AsheqScraperRepository implements IScraper {
   private getMangaData(html: string): Manga {
     const $ = cheerio.load(html);
 
-    // Fix the author split issue
     const authorText = $('.author-content a').text();
     const authors = authorText
       .split(',')
       .map((author) => author.trim())
       .filter((author) => author.length > 0);
 
-    // Fixed splitting for other fields
     const otherTitles = $('.post-content .post-content_item .summary-content')
       .eq(2)
       .text()
@@ -51,6 +51,16 @@ export class AsheqScraperRepository implements IScraper {
       .map((genre) => genre.trim())
       .filter((genre) => genre.length > 0);
 
+    const dateText = $('.post-status .summary-content').first().text().trim();
+    console.log('Parsed date text:', dateText);
+
+    let releaseDate = new Date(dateText);
+
+    if (isNaN(releaseDate.getTime())) {
+      console.log('Invalid date, using current date instead.'); 
+      releaseDate = new Date();
+    }
+
     return {
       title: $('.post-title h1').text().trim(),
       otherTitles,
@@ -62,15 +72,13 @@ export class AsheqScraperRepository implements IScraper {
         .eq(6)
         .text()
         .trim(),
-      releaseDate: new Date(
-        $('.post-status .summary-content').first().text().trim(),
-      ).toISOString(),
+      releaseDate: releaseDate.toISOString(),
       status: $('.post-status .summary-content').last().text().trim(),
       genres,
     };
   }
 
-  private getChapterData(html: string, chapterNumber: string): Chapter {
+  private getChapterData(html: string, chapterNumber: number): Chapter {
     const $ = cheerio.load(html);
     const pages = $('.reading-content img')
       .toArray()
@@ -79,7 +87,7 @@ export class AsheqScraperRepository implements IScraper {
       .map((url) => url.replace(/[\n\t\r]/g, ''));
 
     const title = $('ol.breadcrumb li.active').text().trim();
-    const number = parseInt(chapterNumber);
+    const number = chapterNumber;
     const releaseDate = new Date();
     return {
       title,

@@ -17,7 +17,7 @@ export class AresScraperRepository implements IScraper {
     return data;
   }
 
-  async getChapter(mangaSlug: string, chapterNumber: string): Promise<Chapter> {
+  async getChapter(mangaSlug: string, chapterNumber: number): Promise<Chapter> {
     try {
       const url = `https://fl-ares.com/${mangaSlug}-chapter-${chapterNumber}/`;
 
@@ -63,7 +63,7 @@ export class AresScraperRepository implements IScraper {
 
         return {
           title: title || `Chapter ${chapterNumber}`,
-          number: parseInt(chapterNumber),
+          number: chapterNumber,
           pages,
           releaseDate: new Date(),
         };

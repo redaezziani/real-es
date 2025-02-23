@@ -21,5 +21,5 @@ export interface Chapter {
 
 export interface IScraper {
   getManga(title: string): Promise<Manga>;
-  getChapter(slug: string, chapterNumber: string): Promise<Chapter>;
+  getChapter(mangaId: string, chapterNumber: number): Promise<Chapter>;
 }
