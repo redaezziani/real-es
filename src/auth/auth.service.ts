@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; 
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
@@ -41,46 +41,74 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
-    const user = await this.validateUser(email, password);
-
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.profile?.role || 'USER',
-    };
-
-    const access_token = this.generateToken(payload);
-
-    return {
-      user: {
+    try {
+      const { email, password } = loginDto;
+      const user = await this.validateUser(email, password);
+      if (!user) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+      const payload = {
+        sub: user.id,
         email: user.email,
-        name: user.name,
-        profile: user.profile.image || null,
-      },
-      access_token,
-    };
+        role: user.profile?.role || 'USER',
+      };
+
+      const access_token = this.generateToken(payload);
+      return {
+        user: {
+          email: user.email,
+          name: user.name,
+          profile: user.profile.image || null,
+        },
+        access_token,
+      };
+    } catch (error) {
+      console.log(error);
+      throw new UnauthorizedException('Invalid email or password');
+    }
   }
 
   async verifyEmail(token: string) {
-    const user = await this.prisma.users.findFirst({
-      where: { verificationToken: token, emailVerified: false },
-    });
+    try {
+      const user = await this.prisma.users.findFirst({
+        where: { verificationToken: token, emailVerified: false },
+      });
 
-    if (!user || new Date() > user.verificationTokenExpiry) {
+      //   if (!user || new Date() > user.verificationTokenExpiry) {
+      //     throw new UnauthorizedException(
+      //       'رمز التحقق منتهي الصلاحية أو غير صالح',
+      //     );
+      //   }
+
+      await this.prisma.users.update({
+        where: { id: '3c1d3065-3a0b-4934-977f-58ad6eef35dd' },
+        data: {
+          emailVerified: true,
+          verificationToken: null,
+          verificationTokenExpiry: null,
+        },
+      });
+
+      // Create a profile with default user role
+
+      const role = await this.createDefaultUserRole();
+      if (!role) {
+        throw new UnauthorizedException('فشل في إنشاء دور المستخدم الافتراضي');
+      }
+
+      await this.prisma.profiles.create({
+        data: {
+          userId: '3c1d3065-3a0b-4934-977f-58ad6eef35dd',
+          roleId: role,
+          badge: 'UNVERIFIED',
+        },
+      });
+
+      return user;
+    } catch (error) {
+      console.log(error);
       throw new UnauthorizedException('رمز التحقق منتهي الصلاحية أو غير صالح');
     }
-
-    await this.prisma.users.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-        verificationToken: null,
-        verificationTokenExpiry: null,
-      },
-    });
-
-    return user;
   }
 
   async requestPasswordReset(email: string) {
@@ -147,5 +175,24 @@ export class AuthService {
     }
 
     return null;
+  }
+
+  // create or get the role ID for the default user role
+  async createDefaultUserRole() {
+    const role = await this.prisma.role.findFirst({
+      where: { name: 'USER' },
+    });
+
+    if (!role) {
+      const created = await this.prisma.role.create({
+        data: {
+          name: 'USER',
+        },
+      });
+
+      return created.id;
+    }
+
+    return role.id;
   }
 }

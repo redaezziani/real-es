@@ -9,6 +9,9 @@ import {
   Param,
   Post,
   Query,
+  Delete,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { Manga } from '@prisma/client';
 import { AutoCompleteDto } from './dtos/auto-complet';
@@ -23,6 +26,9 @@ import { ChapterPageDto } from './dtos/chapter-pages.dto';
 import { GetMangaDto } from './dtos/get-manga';
 import { GetChapterBodyDto, GetChapterQueryDto } from './dtos/get-chapter';
 import { ClientProxy } from '@nestjs/microservices';
+import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OnEvent } from '@nestjs/event-emitter';
 
 @ApiTags('manga')
 @Controller('manga')
@@ -161,6 +167,51 @@ export class MangaController {
   async getTypes(): Promise<string[]> {
     try {
       return this.mangaService.getTypes();
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @OnEvent('manga.chapter.keep-reading')
+  @UseGuards(JwtAuthGuard)
+  async createKeepReading(
+    @Body() createKeepReadingDto: CreateKeepReadingDto,
+    @Request() req,
+  ) {
+    try {
+      return await this.mangaService.createKeepReading(
+        createKeepReadingDto,
+        req.user.id,
+      );
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Get('keep-reading')
+  @UseGuards(JwtAuthGuard)
+  async getKeepReading(@Request() req) {
+    try {
+      return await this.mangaService.getKeepReading(req.user.id);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Delete('keep-reading/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteKeepReading(@Param('id') id: string, @Request() req) {
+    try {
+      return await this.mangaService.deleteKeepReading(id, req.user.id);
     } catch (error) {
       throw new HttpException(
         { success: false, message: error.message },

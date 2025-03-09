@@ -1,6 +1,10 @@
 import { RedisService } from './../redis/redis.service';
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/shared/prisma.service';
 import { IManga } from './manga.interface';
 import { Manga } from '@prisma/client';
 
@@ -13,6 +17,8 @@ import {
 import { PaginationQueryDto } from '../common/dtos/pagination-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
 import { MangaRecommendationService } from './service/manga.recommendation.service';
+import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class MangaService implements IManga {
@@ -22,6 +28,7 @@ export class MangaService implements IManga {
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
     private readonly recommendationService: MangaRecommendationService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async all(query: MangaQueryDto): Promise<PaginatedResponse<Manga>> {
@@ -53,7 +60,7 @@ export class MangaService implements IManga {
           },
           {
             otherTitles: {
-              hasSome: [searchTerm], // Fix: Wrap searchTerm in array
+              hasSome: [searchTerm],
             },
           },
           {
@@ -432,6 +439,7 @@ export class MangaService implements IManga {
         },
         select: {
           title: true,
+          id: true,
           chapters: {
             where: {
               number: parseInt(chapter),
@@ -439,6 +447,7 @@ export class MangaService implements IManga {
             select: {
               title: true,
               number: true,
+              id: true,
               pages: {
                 select: {
                   image: true,
@@ -468,6 +477,24 @@ export class MangaService implements IManga {
           data: null,
         };
       }
+      /*
+      export class CreateKeepReadingDto {
+        @ApiProperty()
+        @IsNotEmpty()
+        @IsString()
+        mangaId: string;
+      
+        @ApiProperty()
+        @IsNotEmpty()
+        @IsString()
+        chapterId: string;
+      }
+      */
+      // manga.chapter.keep-reading event:
+      this.eventEmitter.emit('manga.chapter.keep-reading', {
+        mangaId: manga.id,
+        chapterId: chapterData.id,
+      });
 
       return {
         success: true,
@@ -482,5 +509,62 @@ export class MangaService implements IManga {
       console.error('Error in getChapterPages:', error);
       throw new Error(`Failed to fetch chapter pages: ${error.message}`);
     }
+  }
+
+  async createKeepReading(
+    createKeepReadingDto: CreateKeepReadingDto,
+    userId: string,
+  ) {
+    const keepReading = await this.prismaService.keepReading.upsert({
+      where: {
+        userId_mangaId: {
+          userId,
+          mangaId: createKeepReadingDto.mangaId,
+        },
+      },
+      update: {
+        chapterId: createKeepReadingDto.chapterId,
+      },
+      create: {
+        userId,
+        mangaId: createKeepReadingDto.mangaId,
+        chapterId: createKeepReadingDto.chapterId,
+      },
+    });
+
+    return keepReading;
+  }
+
+  async getKeepReading(userId: string) {
+    return await this.prismaService.keepReading.findMany({
+      where: { userId },
+      include: {
+        manga: true,
+        chapter: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+  }
+
+  async deleteKeepReading(id: string, userId: string) {
+    const keepReading = await this.prismaService.keepReading.findUnique({
+      where: { id },
+      include: { user: { include: { profile: true } } },
+    });
+
+    if (!keepReading) {
+      throw new NotFoundException('KeepReading record not found');
+    }
+
+    if (keepReading.userId !== userId) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this record',
+      );
+    }
+
+    return await this.prismaService.keepReading.delete({
+      where: { id },
+    });
   }
 }

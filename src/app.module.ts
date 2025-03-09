@@ -18,6 +18,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 import { CommentsModule } from './comments/comments.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CommentsModule } from './comments/comments.module';
     SubscriptionsModule,
     UsersModule,
     CommentsModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

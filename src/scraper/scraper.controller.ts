@@ -20,7 +20,6 @@ export class ScraperController {
   @EventPattern('scraper.chapter.create')
   async handleChapterCreation(@Payload() params: GetChapterDto) {
     try {
-      console.log('the params :', params);
       const { chapterNumbers, mangaId } = params;
 
       for (const chapterNumber of chapterNumbers) {

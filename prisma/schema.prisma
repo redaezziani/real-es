@@ -111,6 +111,8 @@ model Users {
     Comment Comment[]
 
     CommentLike CommentLike[]
+
+    KeepReading KeepReading[]
 }
 
 model EmailVerificationRequest {
@@ -140,6 +142,9 @@ model PasswordResetRequest {
 enum ScraperPlatform {
     ASHEQ
     ARES
+    HIJALA
+    AZORA
+    ROCKS
 }
 
 model Manga {
@@ -167,6 +172,8 @@ model Manga {
     similarFromManga   MangaSimilarity[]  @relation("TargetManga")
 
     Comment Comment[]
+
+    KeepReading KeepReading[]
 }
 
 
@@ -254,6 +261,8 @@ model Chapter {
     updatedAt   DateTime @updatedAt
     manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
     pages       Page[]
+
+    KeepReading KeepReading[]
 }
 
 model Page {
@@ -309,4 +318,22 @@ model EmailSubscription {
 
   @@index([email])
   @@index([isActive])
+}
+
+model KeepReading {
+  id        String   @id @default(uuid())
+  userId    String
+  mangaId   String
+  chapterId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manga     Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mangaId])
+  @@index([userId])
+  @@index([mangaId])
 }

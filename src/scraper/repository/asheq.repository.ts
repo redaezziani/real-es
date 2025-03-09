@@ -52,12 +52,10 @@ export class AsheqScraperRepository implements IScraper {
       .filter((genre) => genre.length > 0);
 
     const dateText = $('.post-status .summary-content').first().text().trim();
-    console.log('Parsed date text:', dateText);
 
     let releaseDate = new Date(dateText);
 
     if (isNaN(releaseDate.getTime())) {
-      console.log('Invalid date, using current date instead.'); 
       releaseDate = new Date();
     }
 

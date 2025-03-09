@@ -35,7 +35,11 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
   async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+    try {
+      return this.authService.login(loginDto);
+    } catch (error) {
+        return { message: 'Invalid email or password' };
+    }
   }
 
   @Post('verify-email')

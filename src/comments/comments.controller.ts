@@ -5,11 +5,14 @@ import {
   Get,
   Param,
   Post,
-  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { CommentsService } from './comments.service';
+import { CommentAuthGuard } from './guards/auth.guard';
 
 @Controller('comments')
+@UseGuards(CommentAuthGuard)
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
@@ -17,8 +20,9 @@ export class CommentsController {
   async createComment(
     @Param('mangaId') mangaId: string,
     @Body() data: { content: string; parentId?: string },
-    @Query('userId') userId: string,
+    @Request() req,
   ) {
+    const userId = req.user.sub;
     return this.commentsService.createComment(
       mangaId,
       userId,
@@ -28,26 +32,20 @@ export class CommentsController {
   }
 
   @Get('manga/:mangaId')
-  async getComments(
-    @Param('mangaId') mangaId: string,
-    @Query('userId') userId: string,
-  ) {
+  async getComments(@Param('mangaId') mangaId: string, @Request() req) {
+    const userId = req.user.sub;
     return this.commentsService.getComments(mangaId, userId);
   }
 
   @Post(':commentId/like')
-  async toggleLike(
-    @Param('commentId') commentId: string,
-    @Query('userId') userId: string,
-  ) {
+  async toggleLike(@Param('commentId') commentId: string, @Request() req) {
+    const userId = req.user.sub;
     return this.commentsService.toggleLike(commentId, userId);
   }
 
   @Delete(':commentId')
-  async deleteComment(
-    @Param('commentId') commentId: string,
-    @Query('userId') userId: string,
-  ) {
+  async deleteComment(@Param('commentId') commentId: string, @Request() req) {
+    const userId = req.user.sub;
     return this.commentsService.deleteComment(commentId, userId);
   }
 }

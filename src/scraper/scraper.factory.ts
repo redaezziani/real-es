@@ -4,6 +4,9 @@ import { IScraper } from './interface/scraper';
 import { ScraperPlatform } from './types/enums/platform.enum';
 import { AsheqScraperRepository } from './repository/asheq.repository';
 import { AresScraperRepository } from './repository/ares.repository';
+import { HijalaScraperRepository } from './repository/hijala.repository';
+import { RocksMangaScraperRepository } from './repository/rocks.repository';
+import { AzoraMoonScraperRepository } from './repository/azora.repository';
 
 @Injectable()
 export class ScraperFactory {
@@ -16,6 +19,9 @@ export class ScraperFactory {
     this.scrapers = new Map<ScraperPlatform, IScraper>([
       [ScraperPlatform.ASHEQ, asheqScraper],
       [ScraperPlatform.ARES, aresScraper],
+      [ScraperPlatform.HIJALA, new HijalaScraperRepository()],
+      [ScraperPlatform.AZORA, new AzoraMoonScraperRepository()],
+      [ScraperPlatform.ROCKS, new RocksMangaScraperRepository()],
     ]);
   }
 

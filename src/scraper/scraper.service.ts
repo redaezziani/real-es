@@ -49,6 +49,7 @@ export class ScraperService {
         );
       }
 
+
       let coverUrl: string;
       let coverThumbnail: string;
       try {
@@ -61,6 +62,7 @@ export class ScraperService {
           `Failed to upload cover image: ${error.message}`,
         );
       }
+
 
       const manga = await this.prismaService.manga.create({
         data: {
@@ -75,6 +77,7 @@ export class ScraperService {
           status: mangaData.status,
           genres: mangaData.genres,
           coverThumbnail: coverThumbnail,
+          platform: getMangaDto.platform,
           slug,
         },
       });
@@ -84,7 +87,7 @@ export class ScraperService {
       const admins = await this.prismaService.profiles.findMany({
         where: {
           role: {
-            name: 'ADMIN',
+            name: 'USER',
           },
         },
         select: { userId: true },

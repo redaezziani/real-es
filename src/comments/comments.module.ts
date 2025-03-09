@@ -1,9 +1,17 @@
 import { Module } from '@nestjs/common';
-import { CommentsService } from './comments.service';
+import { JwtModule } from '@nestjs/jwt';
 import { CommentsController } from './comments.controller';
+import { CommentsService } from './comments.service';
+import { CommentAuthGuard } from './guards/auth.guard';
 
 @Module({
-  providers: [CommentsService],
-  controllers: [CommentsController]
+  imports: [
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '1d' },
+    }),
+  ],
+  controllers: [CommentsController],
+  providers: [CommentsService, CommentAuthGuard],
 })
 export class CommentsModule {}
