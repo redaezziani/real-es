@@ -17,7 +17,6 @@ export class AzoraMoonScraperRepository implements IScraper {
   }
 
   async getChapter(mangaId: string, chapterNumber: number): Promise<Chapter> {
-   
     throw new Error('Method not implemented.');
   }
 
@@ -33,14 +32,11 @@ export class AzoraMoonScraperRepository implements IScraper {
     const authorText = $('.manga-authors').text().trim();
     const authors = authorText === 'Updating' ? ['Updating'] : [authorText];
 
-    // Get genres from the categories section
     const genres = $('.genres-content a')
       .toArray()
       .map((el) => $(el).text().trim())
       .filter((genre) => genre.length > 0);
 
-
-    // Get description paragraphs
     const descriptionParts = $('.manga-summary p')
       .toArray()
       .map((p) => $(p).text().trim());
@@ -48,14 +44,14 @@ export class AzoraMoonScraperRepository implements IScraper {
 
     return {
       title: $('.post-title h1').text().trim(),
-      otherTitles: [], // No alternative titles section found in provided HTML
+      otherTitles: [], // لا توجد عناوين بديلة في HTML المقدم
       description,
       cover: $('.summary_image a img').attr('src') || '',
       authors,
-      artists: [], // No specific artist field in provided HTML
-      type: 'Manga', // Assuming type since not explicitly specified
-      releaseDate: new Date().toISOString(), // No release date in provided HTML
-      status: 'Updating', // Based on author field showing "Updating"
+      artists: [], // لا يوجد حقل خاص بالفنان في HTML المقدم
+      type: 'مانجا',
+      releaseDate: new Date().toISOString(),
+      status: 'مستمر',
       genres,
     };
   }
@@ -68,7 +64,7 @@ export class AzoraMoonScraperRepository implements IScraper {
       .filter((url): url is string => !!url && url.length > 0)
       .map((url) => url.replace(/[\n\t\r]/g, ''));
 
-    const title = $('.post-title h1').text().trim(); // Adjust this selector based on actual chapter page structure
+    const title = $('.post-title h1').text().trim(); 
     const number = parseInt(chapterNumber);
     const releaseDate = new Date();
 

@@ -5,10 +5,16 @@ export class ChapterPageDto {
   mangaName: string;
 
   @ApiProperty()
+  mangaId: string;
+
+  @ApiProperty()
   chapterName: string;
 
   @ApiProperty()
   chapterNumber: number;
+
+  @ApiProperty()
+  chapterId: string;
 
   @ApiProperty({ type: [String] })
   pages: string[];

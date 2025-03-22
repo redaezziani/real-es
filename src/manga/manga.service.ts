@@ -477,28 +477,12 @@ export class MangaService implements IManga {
           data: null,
         };
       }
-      /*
-      export class CreateKeepReadingDto {
-        @ApiProperty()
-        @IsNotEmpty()
-        @IsString()
-        mangaId: string;
-      
-        @ApiProperty()
-        @IsNotEmpty()
-        @IsString()
-        chapterId: string;
-      }
-      */
-      // manga.chapter.keep-reading event:
-      this.eventEmitter.emit('manga.chapter.keep-reading', {
-        mangaId: manga.id,
-        chapterId: chapterData.id,
-      });
 
       return {
         success: true,
         data: {
+          mangaId: manga.id,
+          chapterId: chapterData.id,
           mangaName: manga.title,
           chapterName: chapterData.title,
           chapterNumber: chapterData.number,
@@ -535,8 +519,8 @@ export class MangaService implements IManga {
     return keepReading;
   }
 
-  async getKeepReading(userId: string) {
-    return await this.prismaService.keepReading.findMany({
+  async getKeepReading(userId: string): Promise<PaginatedResponse<any>> {
+    const keepReadingItems = await this.prismaService.keepReading.findMany({
       where: { userId },
       include: {
         manga: true,
@@ -545,6 +529,19 @@ export class MangaService implements IManga {
       orderBy: { updatedAt: 'desc' },
       take: 10,
     });
+  
+    return {
+      success: true,
+      data: {
+        items: keepReadingItems,
+        meta: {
+          currentPage: 1,
+          itemsPerPage: 10,
+          totalItems: keepReadingItems.length,
+          totalPages: 1,
+        },
+      },
+    };
   }
 
   async deleteKeepReading(id: string, userId: string) {

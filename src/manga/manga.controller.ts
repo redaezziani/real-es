@@ -175,12 +175,13 @@ export class MangaController {
     }
   }
 
-  @OnEvent('manga.chapter.keep-reading')
+  @Post('keep-reading')
   @UseGuards(JwtAuthGuard)
   async createKeepReading(
     @Body() createKeepReadingDto: CreateKeepReadingDto,
     @Request() req,
   ) {
+    console.log('createKeepReadingDto', createKeepReadingDto);
     try {
       return await this.mangaService.createKeepReading(
         createKeepReadingDto,
