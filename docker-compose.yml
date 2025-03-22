@@ -1,50 +1,25 @@
 version: '3.8'
-
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: nestjs-app
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
-      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
-      - RABBITMQ_URL=${CLOUDAMQP_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
-    networks:
-      - app-network
-
-  nginx:
-    image: nginx:alpine
+    build: .
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx:/etc/nginx/conf.d
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
     depends_on:
-      - app
-    networks:
-      - app-network
-    restart: unless-stopped
-    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+      - postgres
+    command: sh -c "npx prisma migrate deploy && npm run start:prod"
 
-  certbot:
-    image: certbot/certbot
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
     volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
-    depends_on:
-      - nginx
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+      - postgres_data:/var/lib/postgresql/data
 
-networks:
-  app-network:
-    driver: bridge
+volumes:
+  postgres_data:
