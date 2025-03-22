@@ -4,7 +4,6 @@ import { CloudinaryService } from './../cloudinary/cloudinary.service';
 import { PrismaService } from 'src/shared/prisma.service';
 import { Manga } from '@prisma/client';
 import { UploadApiResponse } from 'cloudinary';
-import { GetChapterDto } from './dtos/get-chapter';
 import slugify from 'slugify';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationPriority } from '@prisma/client';
@@ -50,6 +49,7 @@ export class ScraperService {
         );
       }
 
+
       let coverUrl: string;
       let coverThumbnail: string;
       try {
@@ -62,6 +62,8 @@ export class ScraperService {
           `Failed to upload cover image: ${error.message}`,
         );
       }
+
+
       const manga = await this.prismaService.manga.create({
         data: {
           title: mangaData.title,
@@ -75,14 +77,17 @@ export class ScraperService {
           status: mangaData.status,
           genres: mangaData.genres,
           coverThumbnail: coverThumbnail,
+          platform: getMangaDto.platform,
           slug,
         },
       });
 
+      await this.calculateAndStoreSimilarities(manga);
+
       const admins = await this.prismaService.profiles.findMany({
         where: {
           role: {
-            name: 'ADMIN',
+            name: 'USER',
           },
         },
         select: { userId: true },
@@ -114,7 +119,7 @@ export class ScraperService {
       );
     }
   }
-  async getChapter(getChapterDto: GetChapterDto) {
+  async getChapter(getChapterDto: { mangaId: string; chapterNumber: number }) {
     try {
       const { mangaId, chapterNumber } = getChapterDto;
       const manga = await this.prismaService.manga.findUnique({
@@ -151,7 +156,7 @@ export class ScraperService {
       const existChapter = await this.prismaService.chapter.findMany({
         where: {
           mangaId: mangaId,
-          number: parseInt(chapterNumber, 10),
+          number: chapterNumber,
         },
       });
       if (existChapter.length > 0) {
@@ -160,7 +165,7 @@ export class ScraperService {
 
       const chapter = await this.prismaService.chapter.create({
         data: {
-          number: parseInt(chapterNumber, 10),
+          number: chapterNumber,
           title: chapterData.title,
           releaseDate: chapterData.releaseDate,
           slug: slugify(chapterData.title, {
@@ -181,9 +186,6 @@ export class ScraperService {
         },
       });
 
-      // get all the admins then send to theme
-
-      console.log('chapter', chapter);
       const admins = await this.prismaService.profiles.findMany({
         where: {
           role: {
@@ -293,5 +295,88 @@ export class ScraperService {
         'Failed to generate and upload thumbnail: ' + error.message,
       );
     }
+  }
+
+  private async calculateAndStoreSimilarities(newManga: Manga): Promise<void> {
+    try {
+      // Get all existing manga except the new one
+      const existingManga = await this.prismaService.manga.findMany({
+        where: {
+          id: {
+            not: newManga.id,
+          },
+        },
+        select: {
+          id: true,
+          genres: true,
+          authors: true,
+          artists: true,
+          type: true,
+        },
+      });
+
+      // Calculate and store similarities for each existing manga
+      const similarityPromises = existingManga.map(async (existingManga) => {
+        const score = this.calculateSimilarityScore(newManga, existingManga);
+
+        // Create bidirectional similarity records
+        await this.prismaService.mangaSimilarity.createMany({
+          data: [
+            {
+              sourceMangaId: newManga.id,
+              targetMangaId: existingManga.id,
+              score,
+            },
+            {
+              sourceMangaId: existingManga.id,
+              targetMangaId: newManga.id,
+              score,
+            },
+          ],
+          skipDuplicates: true,
+        });
+      });
+
+      await Promise.all(similarityPromises);
+    } catch (error) {
+      console.error('Failed to calculate manga similarities:', error);
+      // Don't throw error to prevent blocking manga creation
+    }
+  }
+
+  private calculateSimilarityScore(manga1: Manga, manga2: any): number {
+    let score = 0;
+
+    // Compare genres (40% weight)
+    const sharedGenres = manga1.genres.filter((g) => manga2.genres.includes(g));
+    score +=
+      (sharedGenres.length /
+        Math.max(manga1.genres.length, manga2.genres.length)) *
+      0.4;
+
+    // Compare authors (30% weight)
+    const sharedAuthors = manga1.authors.filter((a) =>
+      manga2.authors.includes(a),
+    );
+    score +=
+      (sharedAuthors.length /
+        Math.max(manga1.authors.length, manga2.authors.length)) *
+      0.3;
+
+    // Compare artists (20% weight)
+    const sharedArtists = manga1.artists.filter((a) =>
+      manga2.artists.includes(a),
+    );
+    score +=
+      (sharedArtists.length /
+        Math.max(manga1.artists.length, manga2.artists.length)) *
+      0.2;
+
+    // Compare type (10% weight)
+    if (manga1.type === manga2.type) {
+      score += 0.1;
+    }
+
+    return score;
   }
 }

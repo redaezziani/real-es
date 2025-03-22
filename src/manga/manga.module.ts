@@ -6,6 +6,7 @@ import { RedisService } from 'src/redis/redis.service';
 import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import { secrets } from 'src/config/secrets';
+import { MangaRecommendationService } from './service/manga.recommendation.service';
 @Module({
   imports: [
     ClientsModule.register([
@@ -23,6 +24,11 @@ import { secrets } from 'src/config/secrets';
     ]),
   ],
   controllers: [MangaController],
-  providers: [MangaService, PrismaService, RedisService],
+  providers: [
+    MangaService,
+    PrismaService,
+    RedisService,
+    MangaRecommendationService,
+  ],
 })
 export class MangaModule {}

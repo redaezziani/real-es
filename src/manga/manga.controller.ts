@@ -1,5 +1,6 @@
 import { MangaService } from './manga.service';
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -8,6 +9,9 @@ import {
   Param,
   Post,
   Query,
+  Delete,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { Manga } from '@prisma/client';
 import { AutoCompleteDto } from './dtos/auto-complet';
@@ -20,8 +24,11 @@ import {
 import { MangaQueryDto } from './dtos/manga-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
 import { GetMangaDto } from './dtos/get-manga';
-import { GetChapterDto } from './dtos/get-chapter';
+import { GetChapterBodyDto, GetChapterQueryDto } from './dtos/get-chapter';
 import { ClientProxy } from '@nestjs/microservices';
+import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OnEvent } from '@nestjs/event-emitter';
 
 @ApiTags('manga')
 @Controller('manga')
@@ -167,6 +174,52 @@ export class MangaController {
       );
     }
   }
+
+  @Post('keep-reading')
+  @UseGuards(JwtAuthGuard)
+  async createKeepReading(
+    @Body() createKeepReadingDto: CreateKeepReadingDto,
+    @Request() req,
+  ) {
+    console.log('createKeepReadingDto', createKeepReadingDto);
+    try {
+      return await this.mangaService.createKeepReading(
+        createKeepReadingDto,
+        req.user.id,
+      );
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Get('keep-reading')
+  @UseGuards(JwtAuthGuard)
+  async getKeepReading(@Request() req) {
+    try {
+      return await this.mangaService.getKeepReading(req.user.id);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Delete('keep-reading/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteKeepReading(@Param('id') id: string, @Request() req) {
+    try {
+      return await this.mangaService.deleteKeepReading(id, req.user.id);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
   @Post('')
   async getManga(@Query() getMangaDto: GetMangaDto) {
     try {
@@ -186,9 +239,14 @@ export class MangaController {
   }
 
   @Post('chapter')
-  async getChapter(@Query() getChapterDto: GetChapterDto) {
-    // Emit event instead of sending message
-    this.client.emit('scraper.chapter.create', getChapterDto);
+  async getChapter(
+    @Query() query: GetChapterQueryDto,
+    @Body() body: GetChapterBodyDto,
+  ) {
+    this.client.emit('scraper.chapter.create', {
+      mangaId: query.mangaId,
+      chapterNumbers: body.chapterNumbers,
+    });
 
     return {
       statusCode: HttpStatus.ACCEPTED,

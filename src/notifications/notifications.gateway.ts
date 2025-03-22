@@ -59,7 +59,6 @@ export class NotificationsGateway
     this.logger.debug('Client user data:', client['user']);
 
     const userId = client['user']?.sub;
-    console.log('userId', userId);
     if (!userId) {
       this.logger.error('No user ID found in socket client');
       throw new WsException('User ID not found');
@@ -113,7 +112,6 @@ export class NotificationsGateway
   }
 
   async sendNotificationToUser(userId: string, notification: any) {
-    console.log('userId', userId);
     this.server.to(`user:${userId}`).emit('notification', notification);
   }
 

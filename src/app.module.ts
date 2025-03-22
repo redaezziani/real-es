@@ -17,6 +17,8 @@ import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
+import { CommentsModule } from './comments/comments.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { UsersModule } from './users/users.module';
     PermissionsModule,
     SubscriptionsModule,
     UsersModule,
+    CommentsModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

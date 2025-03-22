@@ -13,10 +13,8 @@ async function bootstrap() {
   // Move cookie-parser before other middleware
   app.use(cookieParser());
   app.use(logger('dev'));
-  // add a prefix to all routes
   app.setGlobalPrefix('api');
 
-  // Configure RabbitMQ connection with logging
   const microservice = app.connectMicroservice({
     transport: Transport.RMQ,
     options: {
@@ -27,7 +25,7 @@ async function bootstrap() {
       queueOptions: {
         durable: true,
       },
-      noAck: true, // Change to true for auto-acknowledgment
+      noAck: true, 
       timeout: 30000,
     },
   });

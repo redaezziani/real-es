@@ -106,6 +106,13 @@ model Users {
     profile                   Profiles?
     NotificationPreference    NotificationPreference?
     Notification              Notification[]
+    mangaInteractions MangaInteraction[]
+
+    Comment Comment[]
+
+    CommentLike CommentLike[]
+
+    KeepReading KeepReading[]
 }
 
 model EmailVerificationRequest {
@@ -135,6 +142,9 @@ model PasswordResetRequest {
 enum ScraperPlatform {
     ASHEQ
     ARES
+    HIJALA
+    AZORA
+    ROCKS
 }
 
 model Manga {
@@ -157,8 +167,88 @@ model Manga {
     createdAt      DateTime        @default(now())
     updatedAt      DateTime        @updatedAt
     chapters       Chapter[]
+    interactions        MangaInteraction[]
+    similarToManga     MangaSimilarity[]  @relation("SourceManga")
+    similarFromManga   MangaSimilarity[]  @relation("TargetManga")
+
+    Comment Comment[]
+
+    KeepReading KeepReading[]
 }
 
+
+model MangaInteraction {
+    id        String   @id @default(uuid())
+    userId    String
+    mangaId   String
+    type      InteractionType
+    createdAt DateTime @default(now())
+    manga     Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+    user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, mangaId, type])
+    @@index([userId, type])
+    @@index([mangaId, type])
+}
+
+enum InteractionType {
+    VIEW
+    BOOKMARK
+    LIKE
+    COMPLETE
+    DROPPED
+}
+
+model MangaSimilarity {
+    id            String   @id @default(uuid())
+    sourceMangaId String
+    targetMangaId String
+    score         Float    // Similarity score between 0 and 1
+    sourceManga   Manga    @relation("SourceManga", fields: [sourceMangaId], references: [id], onDelete: Cascade)
+    targetManga   Manga    @relation("TargetManga", fields: [targetMangaId], references: [id], onDelete: Cascade)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@unique([sourceMangaId, targetMangaId])
+    @@index([sourceMangaId, score])
+}
+
+// Add to your schema.prisma
+
+model Comment {
+  id        String    @id @default(uuid())
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  mangaId   String
+  userId    String
+  parentId  String?   // For nested comments
+  
+  // Relations
+  manga     Manga     @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  user      Users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  likes     CommentLike[]
+
+  @@index([mangaId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model CommentLike {
+  id        String   @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+  
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+}
 model Chapter {
     id          String   @id @default(uuid())
     title       String
@@ -171,6 +261,8 @@ model Chapter {
     updatedAt   DateTime @updatedAt
     manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
     pages       Page[]
+
+    KeepReading KeepReading[]
 }
 
 model Page {
@@ -226,4 +318,22 @@ model EmailSubscription {
 
   @@index([email])
   @@index([isActive])
+}
+
+model KeepReading {
+  id        String   @id @default(uuid())
+  userId    String
+  mangaId   String
+  chapterId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manga     Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mangaId])
+  @@index([userId])
+  @@index([mangaId])
 }

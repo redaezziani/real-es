@@ -1,6 +1,10 @@
 import { RedisService } from './../redis/redis.service';
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/shared/prisma.service';
 import { IManga } from './manga.interface';
 import { Manga } from '@prisma/client';
 
@@ -12,6 +16,9 @@ import {
 } from '../common/types/api-response.type';
 import { PaginationQueryDto } from '../common/dtos/pagination-query.dto';
 import { ChapterPageDto } from './dtos/chapter-pages.dto';
+import { MangaRecommendationService } from './service/manga.recommendation.service';
+import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class MangaService implements IManga {
@@ -20,6 +27,8 @@ export class MangaService implements IManga {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly redisService: RedisService,
+    private readonly recommendationService: MangaRecommendationService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async all(query: MangaQueryDto): Promise<PaginatedResponse<Manga>> {
@@ -51,7 +60,7 @@ export class MangaService implements IManga {
           },
           {
             otherTitles: {
-              hasSome: [searchTerm], // Fix: Wrap searchTerm in array
+              hasSome: [searchTerm],
             },
           },
           {
@@ -131,21 +140,19 @@ export class MangaService implements IManga {
     }
   }
 
-  async byId(id: string): Promise<SingleResponse<Manga>> {
+  async byId(id: string): Promise<SingleResponse<any>> {
     try {
-      const manga = await this.prismaService.manga.findFirst({
-        where: {
-          OR: [{ id }, { slug: id }],
-        },
-        include: {
-          chapters: {
-            orderBy: {
-              number: 'desc',
-            },
+      const [mangaDetails, similarManga] = await Promise.all([
+        this.prismaService.manga.findUnique({
+          where: { id },
+          include: {
+            chapters: true,
           },
-        },
-      });
-      if (!manga) {
+        }),
+        this.recommendationService.getSimilarManga(id, 9),
+      ]);
+
+      if (!mangaDetails) {
         return {
           success: false,
           message: 'Manga not found',
@@ -154,16 +161,19 @@ export class MangaService implements IManga {
       }
       await this.prismaService.manga.update({
         where: {
-          id: manga.id,
+          id: mangaDetails.id,
         },
         data: {
-          views: manga.views + 1,
+          views: mangaDetails.views + 1,
         },
       });
 
       return {
         success: true,
-        data: manga,
+        data: {
+          mangaDetails: mangaDetails,
+          similarManga: similarManga,
+        },
       };
     } catch (error) {
       console.error('Error in byId manga query:', error);
@@ -364,7 +374,7 @@ export class MangaService implements IManga {
       if (cachedData) {
         try {
           return JSON.parse(cachedData);
-        } catch (e) {
+        } catch (e: any) {
           console.warn('Invalid cached genres data, fetching fresh data');
         }
       }
@@ -429,6 +439,7 @@ export class MangaService implements IManga {
         },
         select: {
           title: true,
+          id: true,
           chapters: {
             where: {
               number: parseInt(chapter),
@@ -436,6 +447,7 @@ export class MangaService implements IManga {
             select: {
               title: true,
               number: true,
+              id: true,
               pages: {
                 select: {
                   image: true,
@@ -469,6 +481,8 @@ export class MangaService implements IManga {
       return {
         success: true,
         data: {
+          mangaId: manga.id,
+          chapterId: chapterData.id,
           mangaName: manga.title,
           chapterName: chapterData.title,
           chapterNumber: chapterData.number,
@@ -479,5 +493,75 @@ export class MangaService implements IManga {
       console.error('Error in getChapterPages:', error);
       throw new Error(`Failed to fetch chapter pages: ${error.message}`);
     }
+  }
+
+  async createKeepReading(
+    createKeepReadingDto: CreateKeepReadingDto,
+    userId: string,
+  ) {
+    const keepReading = await this.prismaService.keepReading.upsert({
+      where: {
+        userId_mangaId: {
+          userId,
+          mangaId: createKeepReadingDto.mangaId,
+        },
+      },
+      update: {
+        chapterId: createKeepReadingDto.chapterId,
+      },
+      create: {
+        userId,
+        mangaId: createKeepReadingDto.mangaId,
+        chapterId: createKeepReadingDto.chapterId,
+      },
+    });
+
+    return keepReading;
+  }
+
+  async getKeepReading(userId: string): Promise<PaginatedResponse<any>> {
+    const keepReadingItems = await this.prismaService.keepReading.findMany({
+      where: { userId },
+      include: {
+        manga: true,
+        chapter: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+  
+    return {
+      success: true,
+      data: {
+        items: keepReadingItems,
+        meta: {
+          currentPage: 1,
+          itemsPerPage: 10,
+          totalItems: keepReadingItems.length,
+          totalPages: 1,
+        },
+      },
+    };
+  }
+
+  async deleteKeepReading(id: string, userId: string) {
+    const keepReading = await this.prismaService.keepReading.findUnique({
+      where: { id },
+      include: { user: { include: { profile: true } } },
+    });
+
+    if (!keepReading) {
+      throw new NotFoundException('KeepReading record not found');
+    }
+
+    if (keepReading.userId !== userId) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this record',
+      );
+    }
+
+    return await this.prismaService.keepReading.delete({
+      where: { id },
+    });
   }
 }

@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  Length,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+  IsInt,
+  Min,
+} from 'class-validator';
 
 export class GetChapterDto {
   @ApiProperty({
@@ -12,14 +21,16 @@ export class GetChapterDto {
   @IsNotEmpty()
   @Length(3, 100)
   mangaId: string;
+
   @ApiProperty({
-    description: 'Chapter number',
-    example: '1',
-    minLength: 1,
-    maxLength: 100,
+    description: 'Chapter numbers',
+    example: [1, 2, 3],
+    type: [Number],
   })
-  @IsString()
-  @IsNotEmpty()
-  @Length(1, 100)
-  chapterNumber: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  chapterNumbers: number[];
 }
