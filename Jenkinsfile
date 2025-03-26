@@ -15,7 +15,8 @@ pipeline {
                         // Clean and checkout the specified branch
                         echo 'Cleaning workspace and checking out the branch...'
                         sh '''
-                            git reset --hard
+                            git fetch origin
+                            git reset --hard origin/${GIT_BRANCH}
                             git clean -fd
                             git checkout ${GIT_BRANCH}
                             git pull origin ${GIT_BRANCH}
@@ -30,8 +31,8 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Stopping and removing old containers...'
-                        // Gracefully stop and remove old containers
-                        sh 'docker-compose down'
+                        // Gracefully stop and remove old containers, volumes, and orphaned containers
+                        sh 'docker-compose down --volumes --remove-orphans'
                     }
                 }
             }
@@ -53,7 +54,8 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Installing npm dependencies...'
-                        // Install npm dependencies for the app container
+                        // Ensure container is running before attempting npm install
+                        sh 'docker-compose ps'
                         sh 'docker-compose exec real-es_app npm install'
                     }
                 }
@@ -65,8 +67,8 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Running tests inside the container...'
-                        // Run tests inside the container
-                        sh 'docker-compose exec real-es_app npm run test'
+                        // Run tests inside the container with verbose output for detailed logs
+                        sh 'docker-compose exec real-es_app npm run test -- --verbose'
                     }
                 }
             }
