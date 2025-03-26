@@ -36,7 +36,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose down'  // Stop and remove old containers
+                        sh 'docker-compose down'  
                     }
                 }
             }
