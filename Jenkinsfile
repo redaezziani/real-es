@@ -1,10 +1,10 @@
 pipeline {
     agent any
-    // test 
+
     environment {
-        DOCKER_COMPOSE_DIR = '/var/lib/jenkins/real-es'  
-        GIT_REPO_URL = 'https://github.com/redaezziani/real-es.git'  
-        GIT_BRANCH = 'master' 
+        DOCKER_COMPOSE_DIR = '/var/lib/jenkins/real-es'
+        GIT_REPO_URL = 'https://github.com/redaezziani/real-es.git'
+        GIT_BRANCH = 'master'  // Consider changing this to a parameter if you want flexibility
     }
 
     stages {
@@ -12,10 +12,11 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'git reset --hard'  
-                        sh 'git clean -fd'  
-                        sh "git checkout ${GIT_BRANCH}" 
-                        sh 'git pull origin master'  
+                        // Clean and checkout the specified branch
+                        sh 'git reset --hard'
+                        sh 'git clean -fd'
+                        sh "git checkout ${GIT_BRANCH}"
+                        sh 'git pull origin ${GIT_BRANCH}'
                     }
                 }
             }
@@ -25,8 +26,12 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        // Ensure the .env file exists and load environment variables
-                        sh 'if [ -f .env ]; then export $(grep -v ^# .env | xargs); fi'  // Load .env variables and ignore comments
+                        // Load environment variables while ignoring comments
+                        sh '''
+                        if [ -f .env ]; then
+                            export $(grep -v ^# .env | xargs)
+                        fi
+                        '''
                     }
                 }
             }
@@ -36,7 +41,8 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose down'  
+                        // Gracefully stop and remove old containers
+                        sh 'docker-compose down'
                     }
                 }
             }
@@ -46,7 +52,8 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose up --build -d'  
+                        // Build and start new containers in detached mode
+                        sh 'docker-compose up --build -d'
                     }
                 }
             }
@@ -56,7 +63,8 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose exec real-es_app npm install'  // Use 'real-es_app' as the backend service name
+                        // Install npm dependencies for the app container
+                        sh 'docker-compose exec real-es_app npm install'
                     }
                 }
             }
@@ -66,7 +74,8 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose exec real-es_app npm run test'  // Use 'real-es_app' as the backend service name
+                        // Run tests inside the container
+                        sh 'docker-compose exec real-es_app npm run test'
                     }
                 }
             }
@@ -76,6 +85,14 @@ pipeline {
     post {
         always {
             sh 'docker system prune -f'
+        }
+
+        success {
+            echo 'Build completed successfully!'
+        }
+
+        failure {
+            echo 'Build failed, please check the logs for more details.'
         }
     }
 }
