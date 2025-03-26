@@ -46,7 +46,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        sh 'docker-compose up --build -d'  // Rebuild and start the containers in detached mode
+                        sh 'docker-compose up --build -d'  
                     }
                 }
             }
