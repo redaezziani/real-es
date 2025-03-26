@@ -258,7 +258,7 @@ model Chapter {
     mangaId     String
     views       Int      @default(0)
     createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+    updatedAt   DateTime @default(now())
     manga       Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
     pages       Page[]
 

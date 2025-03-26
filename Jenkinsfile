@@ -12,7 +12,6 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        // Clean and checkout the specified branch
                         echo 'Cleaning workspace and checking out the branch...'
                         sh '''
                             git fetch origin
@@ -31,7 +30,6 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Stopping and removing old containers...'
-                        // Gracefully stop and remove old containers, volumes, and orphaned containers
                         sh 'docker-compose down --volumes --remove-orphans'
                     }
                 }
@@ -53,8 +51,8 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        echo 'Installing npm dependencies...'
-                        // Ensure container is running before attempting npm install
+                        echo 'Checking container status and installing npm dependencies...'
+                        // Check if the container is running before attempting to install dependencies
                         sh 'docker-compose ps'
                         sh 'docker-compose exec real-es_app npm install'
                     }
