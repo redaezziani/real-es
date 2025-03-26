@@ -13,24 +13,12 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         // Clean and checkout the specified branch
-                        sh 'git reset --hard'
-                        sh 'git clean -fd'
-                        sh "git checkout ${GIT_BRANCH}"
-                        sh 'git pull origin ${GIT_BRANCH}'
-                    }
-                }
-            }
-        }
-
-        stage('Load Environment Variables from .env') {
-            steps {
-                script {
-                    dir(DOCKER_COMPOSE_DIR) {
-                        // Load environment variables while ignoring comments
+                        echo 'Cleaning workspace and checking out the branch...'
                         sh '''
-                        if [ -f .env ]; then
-                            export $(grep -v ^# .env | xargs)
-                        fi
+                            git reset --hard
+                            git clean -fd
+                            git checkout ${GIT_BRANCH}
+                            git pull origin ${GIT_BRANCH}
                         '''
                     }
                 }
@@ -41,6 +29,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
+                        echo 'Stopping and removing old containers...'
                         // Gracefully stop and remove old containers
                         sh 'docker-compose down'
                     }
@@ -52,7 +41,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        // Build and start new containers in detached mode
+                        echo 'Building and starting new containers in detached mode...'
                         sh 'docker-compose up --build -d'
                     }
                 }
@@ -63,6 +52,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
+                        echo 'Installing npm dependencies...'
                         // Install npm dependencies for the app container
                         sh 'docker-compose exec real-es_app npm install'
                     }
@@ -74,6 +64,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
+                        echo 'Running tests inside the container...'
                         // Run tests inside the container
                         sh 'docker-compose exec real-es_app npm run test'
                     }
@@ -84,6 +75,8 @@ pipeline {
 
     post {
         always {
+            echo 'Cleaning up Docker system...'
+            // Clean up unused Docker images, containers, volumes, etc.
             sh 'docker system prune -f'
         }
 
