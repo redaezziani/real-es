@@ -5,7 +5,7 @@ export class ProfileImageDto {
     type: 'string',
     format: 'binary',
     description: 'Profile image file (jpeg/png/jpg)',
-    required: true
+    required: true,
   })
   file: Express.Multer.File;
 }
