@@ -1,6 +1,6 @@
 pipeline {
     agent any
-
+    // test 
     environment {
         DOCKER_COMPOSE_DIR = '/var/lib/jenkins/real-es'  
         GIT_REPO_URL = 'https://github.com/redaezziani/real-es.git'  
