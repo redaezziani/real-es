@@ -56,7 +56,7 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                        // Install dependencies for NestJS (adjust to your service name 'real-es_app')
+                       
                         sh 'docker-compose exec real-es_app npm install'  // Use 'real-es_app' as the backend service name
                     }
                 }
