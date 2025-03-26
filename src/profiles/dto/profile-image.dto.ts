@@ -7,5 +7,5 @@ export class ProfileImageDto {
     description: 'Profile image file (jpeg/png/jpg)',
     required: true,
   })
-  file: Express.Multer.File;
+  file: Express.Multer.File; // Correct Multer file type
 }
