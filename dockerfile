@@ -6,7 +6,6 @@ WORKDIR /app
 # Copy only the necessary package files first for cache optimization
 COPY package*.json ./
 
-# Install dependencies (using npm ci for deterministic installs)
 RUN npm ci
 
 # Copy the rest of the application source code
