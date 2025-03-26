@@ -94,8 +94,7 @@ export class MangaController {
   }
 
   @Get('search/autocomplete')
-  async autocomplete(@Query() query: AutoCompleteDto): Promise<any> {import { OnEvent } from '@nestjs/event-emitter';
-
+  async autocomplete(@Query() query: AutoCompleteDto): Promise<any> {
     try {
       if (!query.search) {
         return {
