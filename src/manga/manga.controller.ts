@@ -28,7 +28,7 @@ import { GetChapterBodyDto, GetChapterQueryDto } from './dtos/get-chapter';
 import { ClientProxy } from '@nestjs/microservices';
 import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { OnEvent } from '@nestjs/event-emitter';
+import { MangaGenresDto } from './dtos/manga-genres.dto';
 
 @ApiTags('manga')
 @Controller('manga')
@@ -94,7 +94,8 @@ export class MangaController {
   }
 
   @Get('search/autocomplete')
-  async autocomplete(@Query() query: AutoCompleteDto): Promise<any> {
+  async autocomplete(@Query() query: AutoCompleteDto): Promise<any> {import { OnEvent } from '@nestjs/event-emitter';
+
     try {
       if (!query.search) {
         return {
@@ -253,5 +254,24 @@ export class MangaController {
       message: 'Chapter scraping request has been queued',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  @Post('genres/filter')
+  @ApiResponse({
+    status: 200,
+    description: 'List of mangas filtered by multiple genres with pagination',
+  })
+  async getMangasByGenres(
+    @Body() genresDto: MangaGenresDto,
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Manga>> {
+    try {
+      return await this.mangaService.getMangasByGenres(genresDto.genres, query);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }
