@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy only the necessary package files first for cache optimization
 COPY package*.json ./
 
-# Install dependencies (only production in the production image)
-RUN npm ci --only=production
+# Install dependencies (including the NestJS CLI globally for building the app)
+RUN npm ci --only=production && npm install -g @nestjs/cli
 
 # Copy the rest of the application source code
 COPY . .
