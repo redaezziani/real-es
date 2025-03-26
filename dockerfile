@@ -1,35 +1,41 @@
-# Stage 1: Build the application
-FROM node:20-alpine AS builder
+# Use a smaller base image
+FROM node:22-alpine AS builder
 
-# Set the working directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy only the necessary package files first for cache optimization
 COPY package*.json ./
-RUN npm install
 
-# Copy the rest of the application code
+# Install dependencies (using npm ci for deterministic installs)
+RUN npm ci
+
+# Copy the rest of the application source code
 COPY . .
+
+# Generate Prisma client (this could be done as part of build step)
+RUN npx prisma generate
 
 # Build the application
 RUN npm run build
 
-# Stage 2: Setup the production environment
-FROM node:18-alpine
+# --------------------------------------------
+# Production image
 
-# Set the working directory
-WORKDIR /usr/src/app
+FROM node:22-alpine
 
-# Copy only the production build and node_modules from the builder stage
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/package*.json ./
+WORKDIR /app
 
-# Install Prisma CLI for running migrations
-RUN npm install -g prisma
+# Copy only necessary artifacts from the builder stage to keep image lean
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/dist ./dist
 
-# Expose the port the app runs on
-EXPOSE 3000
+# Expose port for the app
+EXPOSE 8000
 
-# Command to run the application
-CMD ["node", "dist/main.js"]
+# Use a non-root user (for security reasons)
+USER node
+
+# Start the application
+CMD ["npm", "run", "start:prod"]

@@ -1,36 +1,41 @@
+# Use a smaller base image
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy only the necessary package files first for cache optimization
 COPY package*.json ./
-COPY prisma ./prisma/
 
-# Install dependencies
+# Install dependencies (using npm ci for deterministic installs)
 RUN npm ci
 
-# Copy source code
+# Copy the rest of the application source code
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client (this could be done as part of build step)
 RUN npx prisma generate
 
-# Build application
+# Build the application
 RUN npm run build
 
+# --------------------------------------------
 # Production image
+
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy built assets from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy only necessary artifacts from the builder stage to keep image lean
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/dist ./dist
 
-# Expose port
+# Expose port for the app
 EXPOSE 8000
 
-# Start application
+# Use a non-root user (for security reasons)
+USER node
+
+# Start the application
 CMD ["npm", "run", "start:prod"]
