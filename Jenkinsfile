@@ -26,7 +26,7 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         // Ensure the .env file exists and load environment variables
-                        sh 'if [ -f .env ]; then export $(cat .env | xargs); fi'  // Load .env variables
+                        sh 'if [ -f .env ]; then export $(grep -v ^# .env | xargs); fi'  // Load .env variables and ignore comments
                     }
                 }
             }
@@ -56,7 +56,6 @@ pipeline {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
-                       
                         sh 'docker-compose exec real-es_app npm install'  // Use 'real-es_app' as the backend service name
                     }
                 }
