@@ -405,7 +405,7 @@ export class MangaService implements IManga {
       if (cachedData) {
         try {
           return JSON.parse(cachedData);
-        } catch (e) {
+        } catch (e: any) {
           console.warn('Invalid cached types data, fetching fresh data');
         }
       }
@@ -529,7 +529,7 @@ export class MangaService implements IManga {
       orderBy: { updatedAt: 'desc' },
       take: 10,
     });
-  
+
     return {
       success: true,
       data: {
@@ -563,5 +563,74 @@ export class MangaService implements IManga {
     return await this.prismaService.keepReading.delete({
       where: { id },
     });
+  }
+
+  async getMangasByGenres(
+    genres: string[],
+    query: PaginationQueryDto,
+  ): Promise<PaginatedResponse<Manga>> {
+    try {
+      const { limit = 10, page = 1 } = query;
+      const take = Number(limit);
+      const skip = (Number(page) - 1) * take;
+
+      // Cache key based on genres and pagination
+      const cacheKey = `genres:${genres.sort().join(',')}:${JSON.stringify(query)}`;
+      const cachedResults = await this.redisService.get(cacheKey);
+
+      if (cachedResults) {
+        return JSON.parse(cachedResults);
+      }
+
+      const [data, totalCount] = await Promise.all([
+        this.prismaService.manga.findMany({
+          where: {
+            genres: {
+              hasSome: genres, // Find mangas that have at least one of the specified genres
+            },
+          },
+          skip,
+          take,
+          orderBy: [
+            {
+              rating: 'desc',
+            },
+            {
+              updatedAt: 'desc',
+            },
+          ],
+        }),
+        this.prismaService.manga.count({
+          where: {
+            genres: {
+              hasSome: genres,
+            },
+          },
+        }),
+      ]);
+
+      const totalPages = Math.ceil(totalCount / take);
+      const response = {
+        success: true,
+        data: {
+          items: data,
+          meta: {
+            currentPage: Number(page),
+            itemsPerPage: take,
+            totalItems: totalCount,
+            totalPages,
+          },
+        },
+      };
+
+      // Cache the results
+      await this.redisService.set(cacheKey, JSON.stringify(response));
+      await this.redisService.expire(cacheKey, this.CACHE_TTL);
+
+      return response;
+    } catch (error) {
+      console.error('Error in getMangasByGenres:', error);
+      throw new Error(`Failed to fetch mangas by genres: ${error.message}`);
+    }
   }
 }
