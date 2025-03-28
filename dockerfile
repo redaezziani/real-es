@@ -12,7 +12,7 @@ RUN npm ci --only=production && npm install -g @nestjs/cli
 
 COPY . .
 
-# Generate Prisma client (this could be done as part of the build step)
+
 RUN npx prisma generate
 
 # Build the application (typically includes transpiling TypeScript, etc.)
