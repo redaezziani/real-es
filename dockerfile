@@ -1,4 +1,4 @@
-# Use a smaller base image for the build
+
 FROM node:22-alpine AS builder
 
 WORKDIR /app
