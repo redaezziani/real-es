@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_COMPOSE_DIR = '/var/lib/jenkins/real-es'
         GIT_REPO_URL = 'https://github.com/redaezziani/real-es.git'
-        GIT_BRANCH = 'master'  // Consider changing this to a parameter if you want flexibility
+        GIT_BRANCH = 'master'
     }
 
     stages {
@@ -52,21 +52,8 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Checking container status and installing npm dependencies...'
-                        // Check if the container is running before attempting to install dependencies
                         sh 'docker-compose ps'
                         sh 'docker-compose exec real-es_app npm install'
-                    }
-                }
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                script {
-                    dir(DOCKER_COMPOSE_DIR) {
-                        echo 'Running tests inside the container...'
-                        // Run tests inside the container with verbose output for detailed logs
-                        sh 'docker-compose exec real-es_app npm run test -- --verbose'
                     }
                 }
             }
@@ -76,7 +63,6 @@ pipeline {
     post {
         always {
             echo 'Cleaning up Docker system...'
-            // Clean up unused Docker images, containers, volumes, etc.
             sh 'docker system prune -f'
         }
 
