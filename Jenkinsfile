@@ -30,7 +30,7 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Stopping and removing old containers...'
-                        sh 'docker-compose down --volumes --remove-orphans'
+                        sh 'docker-compose down --volumes --remove-orphans || true'
                     }
                 }
             }
@@ -41,19 +41,38 @@ pipeline {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Building and starting new containers in detached mode...'
-                        sh 'docker-compose up --build -d'
+                        sh '''
+                            docker-compose build --no-cache app
+                            docker-compose up -d
+                        '''
                     }
                 }
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Install and Verify Dependencies') {
             steps {
                 script {
                     dir(DOCKER_COMPOSE_DIR) {
                         echo 'Checking container status and installing npm dependencies...'
-                        sh 'docker-compose ps'
-                        sh 'docker-compose exec real-es_app npm install'
+                        sh '''
+                            docker-compose ps
+                            docker-compose exec -T real-es_app npm ci
+                            docker-compose exec -T real-es_app npm audit
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Build Project') {
+            steps {
+                script {
+                    dir(DOCKER_COMPOSE_DIR) {
+                        echo 'Building the project...'
+                        sh '''
+                            docker-compose exec -T real-es_app npm run build
+                        '''
                     }
                 }
             }
@@ -63,7 +82,7 @@ pipeline {
     post {
         always {
             echo 'Cleaning up Docker system...'
-            sh 'docker system prune -f'
+            sh 'docker system prune -f || true'
         }
 
         success {
@@ -71,7 +90,13 @@ pipeline {
         }
 
         failure {
-            echo 'Build failed, please check the logs for more details.'
+            echo 'Build failed, please check the detailed logs for more information.'
+            script {
+                // Optional: Add more detailed logging or error investigation steps
+                sh '''
+                    docker-compose logs app
+                '''
+            }
         }
     }
 }
