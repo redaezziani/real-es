@@ -3,13 +3,13 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy only the necessary package files first for cache optimization
+
 COPY package*.json ./
 
-# Install dependencies (including the NestJS CLI globally for building the app)
+
 RUN npm ci --only=production && npm install -g @nestjs/cli
 
-# Copy the rest of the application source code
+
 COPY . .
 
 # Generate Prisma client (this could be done as part of the build step)
