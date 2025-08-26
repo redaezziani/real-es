@@ -122,11 +122,17 @@ export class MangaController {
     }
   }
 
-  @Get('/info/:id')
-  @ApiResponse({ status: 200, description: 'Single manga details' })
-  async byId(@Param('id') id: string) {
-    return this.mangaService.byId(id);
+  // get the list of manga chapters
+  @Get('/manga/:id/chapters')
+  @ApiResponse({
+    status: 200,
+    description: 'Get the list of manga chapters',
+    type: ChapterPageDto,
+  })
+  async getMangaChapters(@Param('id') id: string) {
+    return this.mangaService.getMangaChapters(id);
   }
+
   // get the pages of a chapter
   @Get('/manga/:id/chapter/:chapter')
   @ApiResponse({
@@ -272,5 +278,11 @@ export class MangaController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  @Get('/info/:id')
+  @ApiResponse({ status: 200, description: 'Single manga details' })
+  async byId(@Param('id') id: string) {
+    return this.mangaService.byId(id);
   }
 }

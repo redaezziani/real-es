@@ -633,4 +633,49 @@ export class MangaService implements IManga {
       throw new Error(`Failed to fetch mangas by genres: ${error.message}`);
     }
   }
+
+  async getMangaChapters(mangaId: string): Promise<SingleResponse<any>> {
+    try {
+      const manga = await this.prismaService.manga.findFirst({
+        where: {
+          OR: [{ id: mangaId }, { slug: mangaId }],
+        },
+        select: {
+          title: true,
+          id: true,
+          chapters: {
+            select: {
+              id: true,
+              title: true,
+              number: true,
+              createdAt: true,
+            },
+            orderBy: {
+              number: 'desc',
+            },
+          },
+        },
+      });
+
+      if (!manga) {
+        return {
+          success: false,
+          message: 'Manga not found',
+          data: null,
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          mangaId: manga.id,
+          mangaTitle: manga.title,
+          chapters: manga.chapters,
+        },
+      };
+    } catch (error) {
+      console.error('Error in getMangaChapters:', error);
+      throw new Error(`Failed to fetch manga chapters: ${error.message}`);
+    }
+  }
 }

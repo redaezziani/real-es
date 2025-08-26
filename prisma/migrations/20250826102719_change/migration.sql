@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "public"."Chapter" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
