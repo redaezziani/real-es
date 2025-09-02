@@ -499,6 +499,29 @@ export class MangaService implements IManga {
     createKeepReadingDto: CreateKeepReadingDto,
     userId: string,
   ) {
+    // Validate that the manga exists
+    const manga = await this.prismaService.manga.findUnique({
+      where: { id: createKeepReadingDto.mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException('Manga not found');
+    }
+
+    // Validate that the chapter exists and belongs to the manga
+    const chapter = await this.prismaService.chapter.findFirst({
+      where: {
+        id: createKeepReadingDto.chapterId,
+        mangaId: createKeepReadingDto.mangaId,
+      },
+    });
+
+    if (!chapter) {
+      throw new NotFoundException(
+        'Chapter not found or does not belong to this manga',
+      );
+    }
+
     const keepReading = await this.prismaService.keepReading.upsert({
       where: {
         userId_mangaId: {

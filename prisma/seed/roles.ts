@@ -18,34 +18,36 @@ export const baseRoles = [
   {
     name: 'GUEST',
     description: 'Limited access for non-registered users',
-  }
+  },
 ];
+
+import { HttpMethod } from '@prisma/client';
 
 export const basePermissions = [
   // User management
   {
     resource: 'users',
-    method: 'GET',
+    method: HttpMethod.GET,
     path: '/users',
     description: 'View users',
   },
   {
     resource: 'users',
-    method: 'POST',
+    method: HttpMethod.POST,
     path: '/users',
     description: 'Create users',
   },
-  
+
   // Profile management
   {
     resource: 'profiles',
-    method: 'GET',
+    method: HttpMethod.GET,
     path: '/profiles',
     description: 'View profiles',
   },
   {
     resource: 'profiles',
-    method: 'PATCH',
+    method: HttpMethod.PATCH,
     path: '/profiles',
     description: 'Update profiles',
   },
@@ -53,28 +55,28 @@ export const basePermissions = [
   // Manga management
   {
     resource: 'manga',
-    method: 'GET',
+    method: HttpMethod.GET,
     path: '/manga',
     description: 'View manga',
   },
   {
     resource: 'manga',
-    method: 'POST',
+    method: HttpMethod.POST,
     path: '/manga',
     description: 'Create manga',
   },
   {
     resource: 'manga',
-    method: 'PATCH',
+    method: HttpMethod.PATCH,
     path: '/manga',
     description: 'Update manga',
   },
   {
     resource: 'manga',
-    method: 'DELETE',
+    method: HttpMethod.DELETE,
     path: '/manga',
     description: 'Delete manga',
-  }
+  },
 ];
 
 // Role-Permission mappings
@@ -88,21 +90,15 @@ export const rolePermissions = {
     'manga.GET',
     'manga.POST',
     'manga.PATCH',
-    'manga.DELETE'
+    'manga.DELETE',
   ],
   MODERATOR: [
     'users.GET',
     'profiles.GET',
     'manga.GET',
     'manga.POST',
-    'manga.PATCH'
+    'manga.PATCH',
   ],
-  USER: [
-    'profiles.GET',
-    'profiles.PATCH',
-    'manga.GET'
-  ],
-  GUEST: [
-    'manga.GET'
-  ]
+  USER: ['profiles.GET', 'profiles.PATCH', 'manga.GET'],
+  GUEST: ['manga.GET'],
 };

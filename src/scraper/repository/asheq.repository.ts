@@ -18,7 +18,11 @@ export class AsheqScraperRepository implements IScraper {
     return data;
   }
   async getChapter(slug: string, chapterNumber: number): Promise<Chapter> {
-    const url = `${this.url}/manga/${slug}/${chapterNumber}`;
+    const formattedChapterNumber =
+      chapterNumber < 10 ? `0${chapterNumber}` : `${chapterNumber}`;
+    const url = `${this.url}/manga/${slug}/${formattedChapterNumber}`;
+
+    console.log('Fetching chapter from URL:', url);
     const html = await this.getHtml(url);
     return this.getChapterData(html, chapterNumber);
   }
@@ -77,12 +81,22 @@ export class AsheqScraperRepository implements IScraper {
   }
 
   private getChapterData(html: string, chapterNumber: number): Chapter {
+    console.log('Getting chapter data for chapter number:', chapterNumber);
     const $ = cheerio.load(html);
-    const pages = $('.reading-content img')
+    let pages = $('.reading-content img')
       .toArray()
       .map((img) => $(img).attr('src')?.trim())
       .filter((url): url is string => !!url && url.length > 0)
       .map((url) => url.replace(/[\n\t\r]/g, ''));
+    if (pages.length === 0) {
+      pages = $('img.wp-manga-chapter-img')
+        .toArray()
+        .map((img) => $(img).attr('src')?.trim())
+        .filter((url): url is string => !!url && url.length > 0)
+        .map((url) => url.replace(/[\n\t\r]/g, ''));
+
+      
+    }
 
     const title = $('ol.breadcrumb li.active').text().trim();
     const number = chapterNumber;

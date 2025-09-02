@@ -40,28 +40,48 @@ export class HijalaScraperRepository implements IScraper {
 
         await page.waitForSelector('#readerarea', { timeout: 5000 });
 
+        // Scroll to trigger lazy loading
+        await page.evaluate(async () => {
+          await new Promise<void>((resolve) => {
+            let totalHeight = 0;
+            const distance = 400;
+            const timer = setInterval(() => {
+              const scrollHeight = document.body.scrollHeight;
+              window.scrollBy(0, distance);
+              totalHeight += distance;
+              if (totalHeight >= scrollHeight) {
+                clearInterval(timer);
+                resolve();
+              }
+            }, 200);
+          });
+        });
+
+        // wait after scrolling
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const currentUrl = await page.url();
         console.log('Current page URL:', currentUrl);
 
-        const data = await page.evaluate(() => {
+        const data = await page.evaluate(async () => {
           console.log('Starting page evaluation');
 
-          const selectors = [
-            '#readerarea img.ts-main-image',
-            '#readerarea img',
-            '.reading-content img',
-          ];
+          const images = Array.from(
+            document.querySelectorAll('#readerarea img.ts-main-image'),
+          );
 
-          let images = [];
-          for (const selector of selectors) {
-            images = Array.from(document.querySelectorAll(selector));
-            console.log(
-              `Found ${images.length} images with selector: ${selector}`,
-            );
-            if (images.length > 0) break;
-          }
+          // Force load: copy data-src → src if src is placeholder
+          images.forEach((img) => {
+            if (
+              !img.getAttribute('src') ||
+              img.getAttribute('src')?.includes('readerarea.svg')
+            ) {
+              const ds =
+                img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src');
+              if (ds) img.setAttribute('src', ds);
+            }
+          });
 
           const title =
             document.querySelector('.entry-title')?.textContent?.trim() || '';
@@ -69,12 +89,17 @@ export class HijalaScraperRepository implements IScraper {
           const pages = images
             .map((img) => {
               const dataSrc = img.getAttribute('data-src');
-              const src = img.getAttribute('src');
               const dataLazy = img.getAttribute('data-lazy-src');
-              console.log('Image attributes:', { dataSrc, src, dataLazy });
-              return dataSrc || dataLazy || src;
+              const srcset = img.getAttribute('srcset');
+              const src = img.getAttribute('src');
+              return dataSrc || dataLazy || srcset || src;
             })
-            .filter((src) => src && !src.includes('data:image'))
+            .filter(
+              (src) =>
+                src &&
+                !src.includes('readerarea.svg') &&
+                !src.includes('data:image'),
+            )
             .map((src) => src.replace(/[\n\t\r]/g, '').trim());
 
           console.log(`Processed ${pages.length} valid image sources`);
@@ -93,7 +118,7 @@ export class HijalaScraperRepository implements IScraper {
           releaseDate: new Date(),
           pages: data.pages,
         };
-      } catch (error) {
+      } catch (error: any) {
         console.error('Scraping error:', {
           message: error.message,
           stack: error.stack,
@@ -103,7 +128,7 @@ export class HijalaScraperRepository implements IScraper {
       } finally {
         await browser.close();
       }
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to fetch chapter: ${error.message}`);
     }
   }
@@ -165,7 +190,7 @@ export class HijalaScraperRepository implements IScraper {
     const pages = $('#readerarea img.ts-main-image')
       .toArray()
       .map((img) => {
-        const src = $(img).attr('src') || $(img).attr('data-src');
+        const src = $(img).attr('data-src') || $(img).attr('src');
         return src ? src.trim() : null;
       })
       .filter((url): url is string => !!url && url.length > 0)
