@@ -7,10 +7,10 @@ export class AresScraperRepository implements IScraper {
   readonly url: string;
 
   constructor() {
-    this.url = 'https://fl-ares.com';
+    this.url = 'https://ar.areascans.org';
   }
   async getManga(title: string): Promise<Manga> {
-    const url = `${this.url}/series/${title}`;
+    const url = `${this.url}/manga/${title}/`;
     const html = await this.getHtml(url);
 
     const data = this.getMangaData(html);
@@ -19,7 +19,8 @@ export class AresScraperRepository implements IScraper {
 
   async getChapter(mangaSlug: string, chapterNumber: number): Promise<Chapter> {
     try {
-      const url = `https://fl-ares.com/${mangaSlug}-chapter-${chapterNumber}/`;
+      // New URL pattern: https://ar.areascans.org/manga-slug-chapter-number/
+      const url = `${this.url}/${mangaSlug}-chapter-${chapterNumber}/`;
 
       const browser = await puppeteer.launch({
         headless: true,
@@ -29,40 +30,67 @@ export class AresScraperRepository implements IScraper {
       try {
         const page = await browser.newPage();
 
-        // Block image requests to speed up loading
-        await page.setRequestInterception(true);
-        page.on('request', (request) => {
-          if (request.resourceType() === 'image') {
-            request.abort();
-          } else {
-            request.continue();
-          }
-        });
+        // Set user agent to avoid detection
+        await page.setUserAgent(
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        );
 
-        // Navigate and wait for DOMContentLoaded instead of waiting for images
-        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        // Navigate to the chapter page
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
-        // Extract image URLs directly from the DOM
+        // Extract image URLs from various possible selectors
         const pages = await page.evaluate(() => {
-          const images = Array.from(
-            document.querySelectorAll('img.ts-main-image'),
-          );
-          return images
-            .map(
-              (img) => img.getAttribute('src') || img.getAttribute('data-src'),
-            )
-            .filter((src) => src != null);
+          const selectors = [
+            '#readerarea img.ts-main-image ',
+            '.reading-content img',
+            '.chapter-content img',
+            '.page-break img',
+            'img[src*="chapter"]',
+            'img[data-src*="chapter"]',
+          ];
+
+          let images: string[] = [];
+
+          for (const selector of selectors) {
+            const elements = Array.from(document.querySelectorAll(selector));
+            images = elements
+              .map(
+                (img: any) =>
+                  img.getAttribute('src') ||
+                  img.getAttribute('data-src') ||
+                  img.getAttribute('data-original'),
+              )
+              .filter((src: string | null) => src != null && src.trim() !== '');
+
+            if (images.length > 0) {
+              console.log(
+                `Found ${images.length} images with selector: ${selector}`,
+              );
+              break;
+            }
+          }
+
+          return images;
         });
 
         // Get chapter title
-        const title = `Chapter ${chapterNumber}`;
+        const title =
+          (await page.evaluate(() => {
+            return (
+              document.querySelector('h1')?.textContent?.trim() ||
+              document.querySelector('.entry-title')?.textContent?.trim() ||
+              document.title
+            );
+          })) || `Chapter ${chapterNumber}`;
 
         if (pages.length === 0) {
           throw new Error('No pages found for this chapter');
         }
 
+        console.log(`Found ${pages.length} pages for chapter ${chapterNumber}`);
+
         return {
-          title: title || `Chapter ${chapterNumber}`,
+          title,
           number: chapterNumber,
           pages,
           releaseDate: new Date(),
@@ -71,6 +99,7 @@ export class AresScraperRepository implements IScraper {
         await browser.close();
       }
     } catch (error) {
+      console.error(`Error fetching chapter ${chapterNumber}:`, error);
       throw error;
     }
   }
@@ -83,56 +112,118 @@ export class AresScraperRepository implements IScraper {
   private getMangaData(html: string): Manga {
     const $ = cheerio.load(html);
 
-    const title = $('.entry-title').text().trim();
+    // Extract title
+    const title =
+      $('h1').first().text().trim() ||
+      $('.entry-title').text().trim() ||
+      $('.manga-title').text().trim();
 
-    // Fix the author split issue and the author selector is the 4th element
-    const authorText = $('.tsinfo .imptdt i').eq(3).text();
-    const authors = authorText
-      .split(',')
-      .map((author) => author.trim())
-      .filter((author) => author.length > 0);
+    // Extract description - from "قصة العمل" section
+    const description =
+      $('.container__235ca').text().trim() ||
+      $('.summary p').text().trim() ||
+      $('.description').text().trim() ||
+      $('p')
+        .filter((_, el) => $(el).text().includes('العالم في حالة'))
+        .text()
+        .trim() ||
+      'No description available';
 
-    const artistsText = $('.tsinfo .imptdt i').eq(4).text();
-    const artists = artistsText
-      .split(',')
-      .map((artist) => artist.trim())
-      .filter((artist) => artist.length > 0);
+    // Extract cover image
+    const cover =
+      $('img[alt*="' + title + '"]').attr('src') ||
+      $('.manga-cover img').attr('src') ||
+      $('.thumb img').attr('src') ||
+      $('img').first().attr('src') ||
+      '';
 
-    const otherTitles = [];
+    // Extract author - from "المؤلف" section
+    const authorSection = $('h1, h2, h3')
+      .filter((_, el) => $(el).text().trim() === 'المؤلف')
+      .next();
+    const authorText = authorSection.text().trim();
+    const authors =
+      authorText && authorText !== 'Updating'
+        ? [authorText]
+        : ['Unknown Author'];
 
-    const type = $('.tsinfo .imptdt i').eq(1).text().trim();
-    const genres = $('.mgen a')
-      .map((_, el) => $(el).text())
-      .get();
-    const description = $('.entry-content.entry-content-single p')
-      .text()
-      .trim();
-    let releaseDate = $('.tsinfo .imptdt li[datetime]').attr('datetime') || '';
-    let status = $('.tsinfo .imptdt i').eq(0).text().trim();
+    // Extract artist - from "الرسام" section
+    const artistSection = $('h1, h2, h3')
+      .filter((_, el) => $(el).text().trim() === 'الرسام')
+      .next();
+    const artistText = artistSection.text().trim();
+    const artists =
+      artistText && artistText !== 'Updating' ? [artistText] : authors;
+
+    // Extract other titles (alternative names)
+    const otherTitles: string[] = [];
+
+    // Extract type - from "النوع" section
+    const typeSection = $('h1, h2, h3')
+      .filter((_, el) => $(el).text().trim() === 'النوع')
+      .next();
+    const type = typeSection.text().trim() || 'Manhwa';
+
+    // Extract genres from genre links
+    const genres: string[] = [];
+    $('a[href*="/genres/"]').each((_, el) => {
+      const genre = $(el).text().trim();
+      if (genre && !genres.includes(genre)) {
+        genres.push(genre);
+      }
+    });
+
+    // Extract status - from "الحالة" section
+    const statusSection = $('h1, h2, h3')
+      .filter((_, el) => $(el).text().trim() === 'الحالة')
+      .next();
+    let status = statusSection.text().trim();
+
+    // Normalize status
     switch (status.toLowerCase()) {
       case 'completed':
+      case 'مكتملة':
         status = 'مكتملة';
         break;
       case 'ongoing':
+      case 'مستمرة':
+      case 'مستمر':
         status = 'مستمرة';
         break;
       case 'canceled':
+      case 'ملغية':
         status = 'ملغية';
         break;
+      default:
+        status = status || 'مستمرة';
     }
-    if (!Date.parse(releaseDate)) {
+
+    // Extract release date - from "تاريخ الإصدار" section
+    const releaseDateSection = $('h1, h2, h3')
+      .filter((_, el) => $(el).text().trim() === 'تاريخ الإصدار')
+      .next();
+    const releaseDateText = releaseDateSection.text().trim();
+
+    let releaseDate: string;
+    if (releaseDateText && releaseDateText !== 'Updating') {
+      const parsedDate = new Date(releaseDateText);
+      releaseDate = !isNaN(parsedDate.getTime())
+        ? parsedDate.toISOString()
+        : new Date().toISOString();
+    } else {
       releaseDate = new Date().toISOString();
     }
+
     return {
       title,
       otherTitles,
-      cover: $('.thumb img').attr('src') || '',
+      cover,
       authors,
       artists,
       description,
       type,
       releaseDate,
-      genres,
+      genres: genres.length > 0 ? genres : ['Unknown'],
       status,
     };
   }
