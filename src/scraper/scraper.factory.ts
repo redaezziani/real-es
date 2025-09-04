@@ -7,6 +7,7 @@ import { AresScraperRepository } from './repository/ares.repository';
 import { HijalaScraperRepository } from './repository/hijala.repository';
 import { RocksMangaScraperRepository } from './repository/rocks.repository';
 import { AzoraMoonScraperRepository } from './repository/azora.repository';
+import { LekmangaScraperRepository } from './repository/lekmanga.repository';
 
 @Injectable()
 export class ScraperFactory {
@@ -15,6 +16,7 @@ export class ScraperFactory {
   constructor(
     private readonly asheqScraper: AsheqScraperRepository,
     private readonly aresScraper: AresScraperRepository,
+    private readonly lekmangaScraper: LekmangaScraperRepository,
   ) {
     this.scrapers = new Map<ScraperPlatform, IScraper>([
       [ScraperPlatform.ASHEQ, asheqScraper],
@@ -22,6 +24,7 @@ export class ScraperFactory {
       [ScraperPlatform.HIJALA, new HijalaScraperRepository()],
       [ScraperPlatform.AZORA, new AzoraMoonScraperRepository()],
       [ScraperPlatform.ROCKS, new RocksMangaScraperRepository()],
+      [ScraperPlatform.LEKMANGA, lekmangaScraper],
     ]);
   }
 

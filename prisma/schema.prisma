@@ -145,6 +145,7 @@ enum ScraperPlatform {
     HIJALA
     AZORA
     ROCKS
+    LEKMANGA
 }
 
 model Manga {

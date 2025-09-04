@@ -49,7 +49,6 @@ export class ScraperService {
         );
       }
 
-
       let coverUrl: string;
       let coverThumbnail: string;
       try {
@@ -62,7 +61,6 @@ export class ScraperService {
           `Failed to upload cover image: ${error.message}`,
         );
       }
-
 
       const manga = await this.prismaService.manga.create({
         data: {
@@ -348,35 +346,38 @@ export class ScraperService {
     let score = 0;
 
     // Compare genres (40% weight)
-    const sharedGenres = manga1.genres.filter((g) => manga2.genres.includes(g));
-    score +=
-      (sharedGenres.length /
-        Math.max(manga1.genres.length, manga2.genres.length)) *
-      0.4;
+    const genres1 = manga1.genres || [];
+    const genres2 = manga2.genres || [];
+    if (genres1.length > 0 || genres2.length > 0) {
+      const sharedGenres = genres1.filter((g) => genres2.includes(g));
+      const maxGenres = Math.max(genres1.length, genres2.length);
+      score += (sharedGenres.length / maxGenres) * 0.4;
+    }
 
     // Compare authors (30% weight)
-    const sharedAuthors = manga1.authors.filter((a) =>
-      manga2.authors.includes(a),
-    );
-    score +=
-      (sharedAuthors.length /
-        Math.max(manga1.authors.length, manga2.authors.length)) *
-      0.3;
+    const authors1 = manga1.authors || [];
+    const authors2 = manga2.authors || [];
+    if (authors1.length > 0 || authors2.length > 0) {
+      const sharedAuthors = authors1.filter((a) => authors2.includes(a));
+      const maxAuthors = Math.max(authors1.length, authors2.length);
+      score += (sharedAuthors.length / maxAuthors) * 0.3;
+    }
 
     // Compare artists (20% weight)
-    const sharedArtists = manga1.artists.filter((a) =>
-      manga2.artists.includes(a),
-    );
-    score +=
-      (sharedArtists.length /
-        Math.max(manga1.artists.length, manga2.artists.length)) *
-      0.2;
+    const artists1 = manga1.artists || [];
+    const artists2 = manga2.artists || [];
+    if (artists1.length > 0 || artists2.length > 0) {
+      const sharedArtists = artists1.filter((a) => artists2.includes(a));
+      const maxArtists = Math.max(artists1.length, artists2.length);
+      score += (sharedArtists.length / maxArtists) * 0.2;
+    }
 
     // Compare type (10% weight)
-    if (manga1.type === manga2.type) {
+    if (manga1.type && manga2.type && manga1.type === manga2.type) {
       score += 0.1;
     }
 
-    return score;
+    // Ensure score is a valid number between 0 and 1
+    return Math.max(0, Math.min(1, isNaN(score) ? 0 : score));
   }
 }

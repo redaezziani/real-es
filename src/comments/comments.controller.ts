@@ -23,12 +23,16 @@ export class CommentsController {
     @Request() req,
   ) {
     const userId = req.user.sub;
-    return this.commentsService.createComment(
+
+    const res = await this.commentsService.createComment(
       mangaId,
       userId,
       data.content,
       data.parentId,
     );
+
+    console.log('Created comment:', res);
+    return res;
   }
 
   @Get('manga/:mangaId')

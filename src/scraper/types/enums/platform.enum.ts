@@ -4,4 +4,5 @@ export enum ScraperPlatform {
   HIJALA = 'HIJALA',
   AZORA = 'AZORA',
   ROCKS = 'ROCKS',
+  LEKMANGA = 'LEKMANGA',
 }
