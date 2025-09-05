@@ -106,13 +106,13 @@ model Users {
     profile                   Profiles?
     NotificationPreference    NotificationPreference?
     Notification              Notification[]
-    mangaInteractions MangaInteraction[]
+    mangaInteractions         MangaInteraction[]
 
-    Comment Comment[]
-
+    Comment     Comment[]
     CommentLike CommentLike[]
-
     KeepReading KeepReading[]
+    Bookmark    Bookmark[]
+    LikedManga  LikedManga[]
 }
 
 model EmailVerificationRequest {
@@ -149,43 +149,43 @@ enum ScraperPlatform {
 }
 
 model Manga {
-    id             String          @id @default(uuid())
-    title          String
-    slug           String?         @unique
-    rating         Float           @default(0)
-    coverThumbnail String?
-    otherTitles    String[]
-    description    String
-    cover          String
-    authors        String[]
-    artists        String[]
-    platform       ScraperPlatform @default(ASHEQ)
-    type           String
-    releaseDate    DateTime
-    status         String
-    genres         String[]
-    views          Int             @default(0)
-    createdAt      DateTime        @default(now())
-    updatedAt      DateTime        @updatedAt
-    chapters       Chapter[]
-    interactions        MangaInteraction[]
-    similarToManga     MangaSimilarity[]  @relation("SourceManga")
-    similarFromManga   MangaSimilarity[]  @relation("TargetManga")
+    id               String             @id @default(uuid())
+    title            String
+    slug             String?            @unique
+    rating           Float              @default(0)
+    coverThumbnail   String?
+    otherTitles      String[]
+    description      String
+    cover            String
+    authors          String[]
+    artists          String[]
+    platform         ScraperPlatform    @default(ASHEQ)
+    type             String
+    releaseDate      DateTime
+    status           String
+    genres           String[]
+    views            Int                @default(0)
+    createdAt        DateTime           @default(now())
+    updatedAt        DateTime           @updatedAt
+    chapters         Chapter[]
+    interactions     MangaInteraction[]
+    similarToManga   MangaSimilarity[]  @relation("SourceManga")
+    similarFromManga MangaSimilarity[]  @relation("TargetManga")
 
-    Comment Comment[]
-
+    Comment     Comment[]
     KeepReading KeepReading[]
+    Bookmark    Bookmark[]
+    LikedManga  LikedManga[]
 }
 
-
 model MangaInteraction {
-    id        String   @id @default(uuid())
+    id        String          @id @default(uuid())
     userId    String
     mangaId   String
     type      InteractionType
-    createdAt DateTime @default(now())
-    manga     Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
-    user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt DateTime        @default(now())
+    manga     Manga           @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+    user      Users           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([userId, mangaId, type])
     @@index([userId, type])
@@ -204,7 +204,7 @@ model MangaSimilarity {
     id            String   @id @default(uuid())
     sourceMangaId String
     targetMangaId String
-    score         Float    // Similarity score between 0 and 1
+    score         Float // Similarity score between 0 and 1
     sourceManga   Manga    @relation("SourceManga", fields: [sourceMangaId], references: [id], onDelete: Cascade)
     targetManga   Manga    @relation("TargetManga", fields: [targetMangaId], references: [id], onDelete: Cascade)
     createdAt     DateTime @default(now())
@@ -217,39 +217,40 @@ model MangaSimilarity {
 // Add to your schema.prisma
 
 model Comment {
-  id        String    @id @default(uuid())
-  content   String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  mangaId   String
-  userId    String
-  parentId  String?   // For nested comments
-  
-  // Relations
-  manga     Manga     @relation(fields: [mangaId], references: [id], onDelete: Cascade)
-  user      Users     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Comment[] @relation("CommentReplies")
-  likes     CommentLike[]
+    id        String   @id @default(uuid())
+    content   String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    mangaId   String
+    userId    String
+    parentId  String? // For nested comments
 
-  @@index([mangaId])
-  @@index([userId])
-  @@index([parentId])
+    // Relations
+    manga   Manga         @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+    user    Users         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+    replies Comment[]     @relation("CommentReplies")
+    likes   CommentLike[]
+
+    @@index([mangaId])
+    @@index([userId])
+    @@index([parentId])
 }
 
 model CommentLike {
-  id        String   @id @default(uuid())
-  commentId String
-  userId    String
-  createdAt DateTime @default(now())
-  
-  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id        String   @id @default(uuid())
+    commentId String
+    userId    String
+    createdAt DateTime @default(now())
 
-  @@unique([commentId, userId])
-  @@index([commentId])
-  @@index([userId])
+    comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+    user    Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([commentId, userId])
+    @@index([commentId])
+    @@index([userId])
 }
+
 model Chapter {
     id          String   @id @default(uuid())
     title       String
@@ -309,32 +310,62 @@ model Notification {
 }
 
 model EmailSubscription {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  isActive  Boolean   @default(true)
-  topics    String[]  @default([])
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  lastSentAt DateTime?
+    id         String    @id @default(uuid())
+    email      String    @unique
+    isActive   Boolean   @default(true)
+    topics     String[]  @default([])
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    lastSentAt DateTime?
 
-  @@index([email])
-  @@index([isActive])
+    @@index([email])
+    @@index([isActive])
 }
 
 model KeepReading {
-  id        String   @id @default(uuid())
-  userId    String
-  mangaId   String
-  chapterId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+    id        String   @id @default(uuid())
+    userId    String
+    mangaId   String
+    chapterId String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-  // Relations
-  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  manga     Manga    @relation(fields: [mangaId], references: [id], onDelete: Cascade)
-  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+    // Relations
+    user    Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    manga   Manga   @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+    chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, mangaId])
-  @@index([userId])
-  @@index([mangaId])
+    @@unique([userId, mangaId])
+    @@index([userId])
+    @@index([mangaId])
+}
+
+// lets add bookmark model and also liked manga model
+
+model Bookmark {
+    id        String   @id @default(uuid())
+    userId    String
+    mangaId   String
+    createdAt DateTime @default(now())
+
+    user  Users @relation(fields: [userId], references: [id], onDelete: Cascade)
+    manga Manga @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, mangaId])
+    @@index([userId])
+    @@index([mangaId])
+}
+
+model LikedManga {
+    id        String   @id @default(uuid())
+    userId    String
+    mangaId   String
+    createdAt DateTime @default(now())
+
+    user  Users @relation(fields: [userId], references: [id], onDelete: Cascade)
+    manga Manga @relation(fields: [mangaId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, mangaId])
+    @@index([userId])
+    @@index([mangaId])
 }

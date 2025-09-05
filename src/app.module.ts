@@ -18,6 +18,8 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 import { CommentsModule } from './comments/comments.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
+import { LikedMangaModule } from './liked-manga/liked-manga.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
@@ -39,6 +41,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     SubscriptionsModule,
     UsersModule,
     CommentsModule,
+    BookmarksModule,
+    LikedMangaModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
