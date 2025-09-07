@@ -288,12 +288,8 @@ export class MangaController {
   }
 
   @Post('/publish-manga')
-  // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Publish or unpublish a manga' })
   async publishManga(@Body() publishMangaDto: PublishMangaDto, @Request() req) {
-    // Here you might want to check if the user has admin privileges
-    // For simplicity, this example assumes any authenticated user can publish/unpublish
-
     try {
       return await this.mangaService.publishManga(publishMangaDto);
     } catch (error) {
@@ -304,12 +300,8 @@ export class MangaController {
     }
   }
   @Post('/publish-chapter')
-  // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Publish or unpublish a chapter' })
   async publishChapter(@Body() publishChapterDto: PublishChapterDto, @Request() req) {
-    // Here you might want to check if the user has admin privileges
-    // For simplicity, this example assumes any authenticated user can publish/unpublish
-
     try {
       return await this.mangaService.publishChapter(publishChapterDto);
     } catch (error) {

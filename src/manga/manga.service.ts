@@ -791,7 +791,8 @@ export class MangaService implements IManga {
       // Emit event after publishing/unpublishing
       this.eventEmitter.emit('chapter.published', {
         chapterId: chapter.id,
-        chapterNumber: chapter.chapterNumber,
+        chapterNumber: chapter.number
+        ,
         chapterTitle: chapter.title,
         mangaId: chapter.manga.id,
         mangaTitle: chapter.manga.title,
