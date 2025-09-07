@@ -30,6 +30,7 @@ import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MangaGenresDto } from './dtos/manga-genres.dto';
 import { PublishMangaDto } from './dtos/publish-manga';
+import { PublishChapterDto } from './dtos/publish-chapter';
 @ApiTags('manga')
 @Controller('manga')
 export class MangaController {
@@ -286,7 +287,7 @@ export class MangaController {
     return this.mangaService.byId(id);
   }
 
-  @Post('/publish')
+  @Post('/publish-manga')
   // @UseGuards(JwtAuthGuard)
   @ApiResponse({ status: 200, description: 'Publish or unpublish a manga' })
   async publishManga(@Body() publishMangaDto: PublishMangaDto, @Request() req) {
@@ -302,4 +303,21 @@ export class MangaController {
       );
     }
   }
+  @Post('/publish-chapter')
+  // @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Publish or unpublish a chapter' })
+  async publishChapter(@Body() publishChapterDto: PublishChapterDto, @Request() req) {
+    // Here you might want to check if the user has admin privileges
+    // For simplicity, this example assumes any authenticated user can publish/unpublish
+
+    try {
+      return await this.mangaService.publishChapter(publishChapterDto);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: "there was an error" },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
 }

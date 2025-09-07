@@ -20,6 +20,7 @@ import { ChapterPageDto } from './dtos/chapter-pages.dto';
 import { MangaRecommendationService } from './service/manga.recommendation.service';
 import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PublishChapterDto } from './dtos/publish-chapter';
 
 @Injectable()
 export class MangaService implements IManga {
@@ -30,7 +31,6 @@ export class MangaService implements IManga {
     private readonly redisService: RedisService,
     private readonly recommendationService: MangaRecommendationService,
     private eventEmitter: EventEmitter2,
-
   ) {}
 
   async all(query: MangaQueryDto): Promise<PaginatedResponse<Manga>> {
@@ -50,7 +50,7 @@ export class MangaService implements IManga {
 
       // Build the where clause based on filters
       const where: any = {
-        isPublished: { not: false }
+        isPublished: { not: false },
       };
 
       if (search) {
@@ -109,8 +109,6 @@ export class MangaService implements IManga {
       if (Array.isArray(types) && types.length > 0) {
         where.type = {
           in: types,
-          
-        
         };
       }
 
@@ -150,12 +148,14 @@ export class MangaService implements IManga {
     try {
       const [mangaDetails, similarManga] = await Promise.all([
         this.prismaService.manga.findUnique({
-          where: { 
+          where: {
             id,
-            isPublished: { not: false }
+            isPublished: { not: false },
           },
           include: {
-            chapters: true,
+            chapters: {
+              where: { isPublished: { not: false } },
+            },
           },
         }),
         this.recommendationService.getSimilarManga(id, 9),
@@ -205,7 +205,7 @@ export class MangaService implements IManga {
     try {
       const mangas = await this.prismaService.manga.findMany({
         where: {
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         orderBy: {
           createdAt: 'desc',
@@ -240,7 +240,7 @@ export class MangaService implements IManga {
             genres: {
               has: genre, // Fixed: changed hasAny to has
             },
-            isPublished: { not: false }
+            isPublished: { not: false },
           },
           skip,
           take,
@@ -253,7 +253,7 @@ export class MangaService implements IManga {
             genres: {
               has: genre, // Fixed: changed hasAny to has
             },
-            isPublished: { not: false }
+            isPublished: { not: false },
           },
         }),
       ]);
@@ -319,7 +319,7 @@ export class MangaService implements IManga {
               },
             },
           ],
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: {
           title: true,
@@ -365,7 +365,7 @@ export class MangaService implements IManga {
 
       const status = await this.prismaService.manga.findMany({
         where: {
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: { status: true },
       });
@@ -399,7 +399,7 @@ export class MangaService implements IManga {
 
       const genres = await this.prismaService.manga.findMany({
         where: {
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: { genres: true },
       });
@@ -433,7 +433,7 @@ export class MangaService implements IManga {
 
       const types = await this.prismaService.manga.findMany({
         where: {
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: { type: true },
       });
@@ -460,7 +460,7 @@ export class MangaService implements IManga {
       const manga = await this.prismaService.manga.findFirst({
         where: {
           OR: [{ id }, { slug: id }],
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: {
           title: true,
@@ -468,6 +468,7 @@ export class MangaService implements IManga {
           chapters: {
             where: {
               number: parseInt(chapter),
+              isPublished: { not: false },
             },
             select: {
               title: true,
@@ -526,9 +527,9 @@ export class MangaService implements IManga {
   ) {
     // Validate that the manga exists
     const manga = await this.prismaService.manga.findUnique({
-      where: { 
+      where: {
         id: createKeepReadingDto.mangaId,
-        isPublished: { not: false }
+        isPublished: { not: false },
       },
     });
 
@@ -639,7 +640,7 @@ export class MangaService implements IManga {
             genres: {
               hasSome: genres, // Find mangas that have at least one of the specified genres
             },
-            isPublished: { not: false }
+            isPublished: { not: false },
           },
           skip,
           take,
@@ -657,7 +658,7 @@ export class MangaService implements IManga {
             genres: {
               hasSome: genres,
             },
-            isPublished: { not: false }
+            isPublished: { not: false },
           },
         }),
       ]);
@@ -692,12 +693,15 @@ export class MangaService implements IManga {
       const manga = await this.prismaService.manga.findFirst({
         where: {
           OR: [{ id: mangaId }, { slug: mangaId }],
-          isPublished: { not: false }
+          isPublished: { not: false },
         },
         select: {
           title: true,
           id: true,
           chapters: {
+            where: {
+              isPublished: { not: false },
+            },
             select: {
               id: true,
               title: true,
@@ -733,10 +737,9 @@ export class MangaService implements IManga {
     }
   }
 
-
-  async publishManga(data : PublishMangaDto) {
+  async publishManga(data: PublishMangaDto) {
     try {
-       const manga = await this.prismaService.manga.update({
+      const manga = await this.prismaService.manga.update({
         where: { id: data.mangaId },
         data: {
           isPublished: data.publish,
@@ -746,17 +749,64 @@ export class MangaService implements IManga {
       if (!manga) {
         throw new NotFoundException('Manga not found');
       }
-    
+
       // Emit event after publishing/unpublishing
-      this.eventEmitter.emit('manga.published', { mangaId: manga.id, isPublished: manga.isPublished });
-    
+      this.eventEmitter.emit('manga.published', {
+        mangaId: manga.id,
+        mangaTitle: manga.title,
+        mangaSlug: manga.slug,
+        coverImage: manga.cover,
+        author: manga.authors.join(', '),
+        artist: manga.artists.join(', '),
+        description: manga.description,
+        isPublished: manga.isPublished,
+      });
+
       return {
         success: true,
         message: `Manga has been ${data.publish ? 'published' : 'unpublished'} successfully.`,
         data: manga,
-      };  
+      };
     } catch (error) {
       throw new Error(`Failed to publish manga: ${error.message}`);
+    }
+  }
+
+  async publishChapter(data: PublishChapterDto) {
+    try {
+      const chapter = await this.prismaService.chapter.update({
+        where: { id: data.chapterId },
+        data: {
+          isPublished: data.publish,
+        },
+        include: {
+          manga: true
+        }
+      });
+
+      if (!chapter) {
+        throw new NotFoundException('Chapter not found');
+      }
+      
+      // Emit event after publishing/unpublishing
+      this.eventEmitter.emit('chapter.published', {
+        chapterId: chapter.id,
+        chapterNumber: chapter.chapterNumber,
+        chapterTitle: chapter.title,
+        mangaId: chapter.manga.id,
+        mangaTitle: chapter.manga.title,
+        mangaSlug: chapter.manga.slug,
+        coverImage: chapter.manga.cover,
+        isPublished: chapter.isPublished,
+      });
+
+      return {
+        success: true,
+        message: `Chapter has been ${data.publish ? 'published' : 'unpublished'} successfully.`,
+        data: chapter,
+      };
+    } catch (error) {
+      throw new Error(`Failed to publish chapter: ${error.message}`);
     }
   }
 }

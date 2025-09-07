@@ -11,39 +11,32 @@ export class MangaEvents {
   ) {}
 
   @OnEvent('manga.published')
-  async handleMangaPublishedEvent(payload: { mangaId: string; isPublished: boolean }) {
-    console.log('📢 Manga published event received:', payload);
+  async handleMangaPublishedEvent(payload: {
+    mangaId: string;
+    mangaTitle: string;
+    mangaSlug?: string;
+    coverImage?: string;
+    author?: string;
+    artist?: string;
+    description?: string;
+    isPublished: boolean;
+  }) {
     
-    // Only send notification if manga is being published (not unpublished)
     if (payload.isPublished) {
       try {
-        // Fetch the manga details to send in the notification
-        const manga = await this.prismaService.manga.findUnique({
-          where: { id: payload.mangaId },
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            cover: true,
-            description: true,
-            authors: true,
-            artists: true,
-          }
-        });
-
-        if (manga) {
-          // Send notification to all users subscribed to manga updates
+        
+        if (payload.mangaId && payload.mangaTitle) {
           await this.mangaNotificationGateway.sendMangaPublishedNotification({
-            mangaId: manga.id,
-            mangaTitle: manga.title,
-            mangaSlug: manga.slug,
-            coverImage: manga.cover,
-            author: manga.authors.join(', '),
-            artist: manga.artists.join(', '),
-            description: manga.description,
+            mangaId: payload.mangaId,
+            mangaTitle: payload.mangaTitle,
+            mangaSlug: payload.mangaSlug,
+            coverImage: payload.coverImage,
+            author: payload.author,
+            artist: payload.artist,
+            description: payload.description,
           });
 
-          console.log(`✅ WebSocket notification sent for published manga: ${manga.title}`);
+          console.log(`✅ WebSocket notification sent for published manga: ${payload.mangaTitle}`);
         }
       } catch (error) {
         console.error('❌ Error sending manga publication notification:', error);
@@ -52,4 +45,40 @@ export class MangaEvents {
       console.log('📢 Manga unpublished, no notification sent');
     }
   }
+
+  @OnEvent('chapter.published')
+  async handleChapterPublishedEvent(payload: {
+    chapterId: string;
+    chapterNumber: number;
+    chapterTitle: string;
+    mangaId: string;
+    mangaTitle: string;
+    mangaSlug?: string;
+    coverImage?: string;
+    isPublished: boolean;
+  }) {
+    
+    if (payload.isPublished) {
+      try {
+        if (payload.chapterId && payload.mangaId) {
+          await this.mangaNotificationGateway.sendNewChapterNotification({
+            mangaId: payload.mangaId,
+            mangaTitle: payload.mangaTitle,
+            mangaSlug: payload.mangaSlug,
+            coverImage: payload.coverImage,
+            chapterNumber: payload.chapterNumber,
+            chapterTitle: payload.chapterTitle,
+            chapterId: payload.chapterId,
+          });
+
+          console.log(`✅ WebSocket notification sent for published chapter: ${payload.chapterTitle} of ${payload.mangaTitle}`);
+        }
+      } catch (error) {
+        console.error('❌ Error sending chapter publication notification:', error);
+      }
+    } else {
+      console.log('📢 Chapter unpublished, no notification sent');
+    }
+  }
+
 }
