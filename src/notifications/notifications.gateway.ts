@@ -1,21 +1,17 @@
 import {
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  WsException,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'ws';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsAuthGuard } from './ws-auth.guard';
 import { JwtService } from '@nestjs/jwt';
+import * as WebSocket from 'ws';
 
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-  namespace: 'notifications',
+  path: '/notifications',
 })
 @UseGuards(WsAuthGuard)
 export class NotificationsGateway
@@ -25,64 +21,86 @@ export class NotificationsGateway
 
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(NotificationsGateway.name);
-  private userSockets: Map<string, string[]> = new Map();
+  private userSockets: Map<string, WebSocket[]> = new Map();
+  private authenticatedClients: Map<WebSocket, any> = new Map();
 
-  async handleConnection(client: Socket) {
+  async handleConnection(client: WebSocket, request: any) {
     try {
-      const token = this.extractToken(client);
+      const token = this.extractToken(request);
       if (!token) {
         this.logger.error('No token provided');
-        client.disconnect();
+        client.close(4001, 'No authentication token provided');
         return;
       }
 
       const payload = await this.jwtService.verifyAsync(token);
-      client['user'] = payload;
+      this.authenticatedClients.set(client, payload);
 
-      this.logger.log(`Client authenticated and connected: ${client.id}`);
-      this.logger.debug('User data:', client['user']);
+      // Set up message handler
+      client.on('message', (data) => {
+        this.handleMessage(client, data);
+      });
+
+      this.logger.log(`Client authenticated and connected: ${payload.sub}`);
+      this.logger.debug('User data:', payload);
     } catch (error) {
       this.logger.error('Authentication failed:', error.message);
-      client.disconnect();
+      client.close(4001, 'Authentication failed');
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
-    this.logger.debug('Disconnect reason:', client.disconnected);
+  handleDisconnect(client: WebSocket) {
+    this.logger.log(`Client disconnected`);
     this.removeSocket(client);
+    this.authenticatedClients.delete(client);
   }
 
-  @SubscribeMessage('subscribe')
-  handleSubscribe(client: Socket) {
-    this.logger.debug('Subscribe attempt from client:', client['user']?.sub);
-    this.logger.debug('Client user data:', client['user']);
+  private handleMessage(client: WebSocket, data: WebSocket.Data) {
+    try {
+      const message = JSON.parse(data.toString());
+      this.logger.debug(`Received message: ${message.event}`, message.data);
 
-    const userId = client['user']?.sub;
+      switch (message.event) {
+        case 'subscribe':
+          this.handleSubscribe(client);
+          break;
+        default:
+          this.logger.warn(`Unknown message event: ${message.event}`);
+      }
+    } catch (error) {
+      this.logger.error('Error parsing message:', error);
+    }
+  }
+
+  private handleSubscribe(client: WebSocket) {
+    const user = this.authenticatedClients.get(client);
+    this.logger.debug('Subscribe attempt from client:', user?.sub);
+    this.logger.debug('Client user data:', user);
+
+    const userId = user?.sub;
     if (!userId) {
       this.logger.error('No user ID found in socket client');
-      throw new WsException('User ID not found');
+      client.send(JSON.stringify({ event: 'error', data: { message: 'User ID not found' } }));
+      return;
     }
 
-    this.addSocket(userId, client.id);
-    client.join(`user:${userId}`);
-
-    // Also join manga notifications channel
-    client.join('manga-updates');
+    this.addSocket(userId, client);
 
     this.logger.log(`User ${userId} subscribed to notifications`);
-    return { status: 'subscribed' };
+    client.send(JSON.stringify({ event: 'subscribed', data: { status: 'subscribed' } }));
   }
 
-  private addSocket(userId: string, socketId: string) {
-    const userSocketIds = this.userSockets.get(userId) || [];
-    userSocketIds.push(socketId);
-    this.userSockets.set(userId, userSocketIds);
+  private addSocket(userId: string, client: WebSocket) {
+    const userSockets = this.userSockets.get(userId) || [];
+    userSockets.push(client);
+    this.userSockets.set(userId, userSockets);
   }
 
-  private removeSocket(client: Socket) {
+  private removeSocket(client: WebSocket) {
+    const user = this.authenticatedClients.get(client);
+    
     this.userSockets.forEach((sockets, userId) => {
-      const index = sockets.indexOf(client.id);
+      const index = sockets.indexOf(client);
       if (index !== -1) {
         sockets.splice(index, 1);
         if (sockets.length === 0) {
@@ -92,35 +110,60 @@ export class NotificationsGateway
     });
   }
 
-  private extractToken(client: Socket): string | undefined {
-    // Try to get token from headers first
-    const authHeader = client.handshake.headers.authorization;
-    if (authHeader) {
-      const [type, token] = authHeader.split(' ');
-      if (type === 'Bearer') return token;
-    }
+  private extractToken(request: any): string | undefined {
+    try {
+      // Try to get token from URL query parameters
+      const url = new URL(request.url, `http://${request.headers.host}`);
+      const authToken = url.searchParams.get('auth_token');
+      
+      if (authToken) {
+        // Clean the token if it has quotes
+        return authToken.replace(/^["'](.+)["']$/, '$1');
+      }
 
-    // If not in headers, try query parameters
-    const queryToken = client.handshake.query.auth_token;
-    if (queryToken) {
-      // Clean the token if it has quotes
-      const token = Array.isArray(queryToken) ? queryToken[0] : queryToken;
-      return token.replace(/^["'](.+)["']$/, '$1');
-    }
+      // Try to get token from headers
+      const authHeader = request.headers.authorization;
+      if (authHeader) {
+        const [type, token] = authHeader.split(' ');
+        if (type === 'Bearer') return token;
+      }
 
-    return undefined;
+      return undefined;
+    } catch (error) {
+      this.logger.error('Error extracting token:', error);
+      return undefined;
+    }
   }
 
   async sendNotificationToUser(userId: string, notification: any) {
-    this.server.to(`user:${userId}`).emit('notification', notification);
+    const userSockets = this.userSockets.get(userId);
+    if (userSockets) {
+      userSockets.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ event: 'notification', data: notification }));
+        }
+      });
+    }
   }
 
   async sendBroadcast(notification: any) {
-    this.server.emit('notification', notification);
+    this.userSockets.forEach((sockets) => {
+      sockets.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ event: 'notification', data: notification }));
+        }
+      });
+    });
   }
 
   async sendMangaNotification(notification: any) {
-    // this is mean to be a private channel for manga updates
-    this.server.to('manga-updates').emit('manga-notification', notification);
+    // Send to all connected users for now (could be improved with specific manga subscriptions)
+    this.userSockets.forEach((sockets) => {
+      sockets.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ event: 'manga-notification', data: notification }));
+        }
+      });
+    });
   }
 }

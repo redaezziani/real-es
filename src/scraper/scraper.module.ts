@@ -3,6 +3,7 @@ import { ScraperService } from './scraper.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { PrismaService } from 'src/shared/prisma.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { WebSocketModule } from '../shared/websocket/websocket.module';
 import { ScraperFactory } from './scraper.factory';
 import { AsheqScraperRepository } from './repository/asheq.repository';
 import { AresScraperRepository } from './repository/ares.repository';
@@ -28,6 +29,7 @@ import { secrets } from 'src/config/secrets';
       },
     ]),
     NotificationsModule,
+    WebSocketModule,
   ],
   providers: [
     ScraperService,

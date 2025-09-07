@@ -20,6 +20,7 @@ import { UsersModule } from './users/users.module';
 import { CommentsModule } from './comments/comments.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { LikedMangaModule } from './liked-manga/liked-manga.module';
+import { TestModule } from './test/test.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
@@ -43,6 +44,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     CommentsModule,
     BookmarksModule,
     LikedMangaModule,
+    TestModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],

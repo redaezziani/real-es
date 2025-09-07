@@ -6,6 +6,7 @@ import { Manga } from '@prisma/client';
 import { UploadApiResponse } from 'cloudinary';
 import slugify from 'slugify';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MangaNotificationGateway } from '../shared/websocket/gateways/manga-notification.gateway';
 import { NotificationPriority } from '@prisma/client';
 import { ScraperPlatform } from './types/enums/platform.enum';
 import { IScraper } from './interface/scraper';
@@ -20,9 +21,11 @@ export class ScraperService {
     private readonly prismaService: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly scraperFactory: ScraperFactory,
+    private readonly mangaNotificationGateway: MangaNotificationGateway,
   ) {}
 
   async getManga(getMangaDto: GetMangaDto): Promise<Manga> {
+    console.log('🔄 Starting manga scraping process for:', getMangaDto.title);
     try {
       const slug = slugify(getMangaDto.title, {
         replacement: '-',
@@ -106,6 +109,20 @@ export class ScraperService {
           ),
         ),
       );
+
+      // Send WebSocket notification for new manga
+      console.log('📡 Attempting to send WebSocket notification for manga:', manga.title);
+      try {
+        await this.mangaNotificationGateway.sendNewMangaNotification({
+          mangaId: manga.id,
+          mangaTitle: manga.title,
+          mangaSlug: manga.slug,
+          coverImage: manga.cover,
+        });
+        console.log('✅ WebSocket notification sent successfully for manga:', manga.title);
+      } catch (error) {
+        console.error('❌ Failed to send WebSocket notification:', error);
+      }
 
       return manga;
     } catch (error) {
@@ -208,6 +225,18 @@ export class ScraperService {
           ),
         ),
       );
+
+      // Send WebSocket notification for new chapter
+      await this.mangaNotificationGateway.sendNewChapterNotification({
+        mangaId: chapter.manga.id,
+        mangaTitle: chapter.manga.title,
+        mangaSlug: chapter.manga.slug,
+        chapterId: chapter.id,
+        chapterNumber: chapter.number,
+        chapterTitle: chapter.title,
+        coverImage: chapter.manga.cover,
+      });
+
       return chapter;
     } catch (error) {
       if (error instanceof BadRequestException) {

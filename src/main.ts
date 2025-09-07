@@ -6,11 +6,16 @@ import * as cookieParser from 'cookie-parser';
 import { Transport } from '@nestjs/microservices';
 import * as logger from 'morgan';
 import { secrets } from './config/secrets';
+import { WsAdapter } from '@nestjs/platform-ws';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
-  // Move cookie-parser before other middleware
+  
+  // Configure WebSocket adapter
+  app.useWebSocketAdapter(new WsAdapter(app));
+
   app.use(cookieParser());
   app.use(logger('dev'));
   app.setGlobalPrefix('api');
@@ -30,15 +35,12 @@ async function bootstrap() {
     },
   });
 
-  // Add connection logging
-  microservice
-    .listen()
-    .then(() => {
-      console.log('Microservice is listening');
-    })
-    .catch((err) => {
-      console.error('Microservice failed to start:', err);
-    });
+  microservice.listen().then(() => {
+    console.log('Microservice is listening')
+  }).catch((err) => {
+    console.error('Microservice failed to start:', err)
+    process.exit(1);}
+  );
 
   // Swagger setup
   const config = new DocumentBuilder()
@@ -70,24 +72,15 @@ async function bootstrap() {
     customSiteTitle: 'Manga API Docs',
   });
 
-  app.enableVersioning({
-    type: VersioningType.URI,
-  });
+  app.enableVersioning({type: VersioningType.URI});
   app.enableCors({
     origin: '*',
-    credentials: true, // Important for cookies
+    credentials: true, 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe({transform: true,transformOptions: {enableImplicitConversion: true}}));
 
   await app.listen(secrets.app.port);
 }

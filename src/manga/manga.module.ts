@@ -7,6 +7,8 @@ import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import { secrets } from 'src/config/secrets';
 import { MangaRecommendationService } from './service/manga.recommendation.service';
+import { MangaNotificationEventHandler } from './manga-notification-event.handler';
+
 @Module({
   imports: [
     ClientsModule.register([
@@ -29,6 +31,9 @@ import { MangaRecommendationService } from './service/manga.recommendation.servi
     PrismaService,
     RedisService,
     MangaRecommendationService,
+    MangaNotificationEventHandler,
   ],
 })
+
+
 export class MangaModule {}
