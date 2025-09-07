@@ -257,16 +257,47 @@ export class MangaNotificationGateway
       mangaSlug: mangaData.mangaSlug,
       coverImage: mangaData.coverImage,
       timestamp: new Date(),
-      message: `New manga "${mangaData.mangaTitle}" has been added!`
+      message: `New manga "${mangaData.mangaTitle}" has been published!`
     };
 
     // Send to all users subscribed to manga updates
     this.broadcastToRoom('manga-updates', {
-      event: 'new-manga',
+      event: 'manga-published',
       data: notification
     });
     
-    this.logger.log(`Sent new manga notification: ${mangaData.mangaTitle}`);
+    this.logger.log(`Sent manga published notification: ${mangaData.mangaTitle}`);
+  }
+
+  /**
+   * Send notification when a manga is published
+   */
+  async sendMangaPublishedNotification(mangaData: IMangaUpdateData): Promise<void> {
+    const notification: IMangaNotificationPayload = {
+      id: `published-${mangaData.mangaId}-${Date.now()}`,
+      type: 'new_manga',
+      mangaId: mangaData.mangaId,
+      mangaTitle: mangaData.mangaTitle,
+      mangaSlug: mangaData.mangaSlug,
+      coverImage: mangaData.coverImage,
+      timestamp: new Date(),
+      message: `"${mangaData.mangaTitle}" is now published and available to read!`
+    };
+
+    // Send to all users subscribed to manga updates
+    this.broadcastToRoom('manga-updates', {
+      event: 'manga-published',
+      data: notification
+    });
+
+    // Also send to users subscribed to this specific manga
+    const specificRoom = `manga:${mangaData.mangaId}`;
+    this.broadcastToRoom(specificRoom, {
+      event: 'manga-published',
+      data: notification
+    });
+    
+    this.logger.log(`Sent manga published notification: ${mangaData.mangaTitle}`);
   }
 
   /**

@@ -7,7 +7,8 @@ import { ClientsModule } from '@nestjs/microservices';
 import { Transport } from '@nestjs/microservices';
 import { secrets } from 'src/config/secrets';
 import { MangaRecommendationService } from './service/manga.recommendation.service';
-import { MangaNotificationEventHandler } from './manga-notification-event.handler';
+import { MangaEvents } from './manga.events';
+import { WebSocketModule } from '../shared/websocket/websocket.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { MangaNotificationEventHandler } from './manga-notification-event.handle
         },
       },
     ]),
+    WebSocketModule,
   ],
   controllers: [MangaController],
   providers: [
@@ -31,9 +33,8 @@ import { MangaNotificationEventHandler } from './manga-notification-event.handle
     PrismaService,
     RedisService,
     MangaRecommendationService,
-    MangaNotificationEventHandler,
+    MangaEvents
   ],
 })
-
 
 export class MangaModule {}

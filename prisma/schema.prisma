@@ -163,6 +163,7 @@ model Manga {
     type             String
     releaseDate      DateTime
     status           String
+    isPublished      Boolean            @default(false)
     genres           String[]
     views            Int                @default(0)
     createdAt        DateTime           @default(now())
@@ -171,7 +172,6 @@ model Manga {
     interactions     MangaInteraction[]
     similarToManga   MangaSimilarity[]  @relation("SourceManga")
     similarFromManga MangaSimilarity[]  @relation("TargetManga")
-
     Comment     Comment[]
     KeepReading KeepReading[]
     Bookmark    Bookmark[]

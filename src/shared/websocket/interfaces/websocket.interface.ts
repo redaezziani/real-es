@@ -51,4 +51,6 @@ export interface IMangaUpdateData {
   chapterTitle?: string;
   chapterId?: string;
   description?: string;
+  author?: string;
+  artist?: string;
 }

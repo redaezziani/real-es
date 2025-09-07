@@ -29,7 +29,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { CreateKeepReadingDto } from './dtos/keep-reading.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MangaGenresDto } from './dtos/manga-genres.dto';
-
+import { PublishMangaDto } from './dtos/publish-manga';
 @ApiTags('manga')
 @Controller('manga')
 export class MangaController {
@@ -284,5 +284,22 @@ export class MangaController {
   @ApiResponse({ status: 200, description: 'Single manga details' })
   async byId(@Param('id') id: string) {
     return this.mangaService.byId(id);
+  }
+
+  @Post('/publish')
+  // @UseGuards(JwtAuthGuard)
+  @ApiResponse({ status: 200, description: 'Publish or unpublish a manga' })
+  async publishManga(@Body() publishMangaDto: PublishMangaDto, @Request() req) {
+    // Here you might want to check if the user has admin privileges
+    // For simplicity, this example assumes any authenticated user can publish/unpublish
+
+    try {
+      return await this.mangaService.publishManga(publishMangaDto);
+    } catch (error) {
+      throw new HttpException(
+        { success: false, message: "there was an error" },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }
