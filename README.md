@@ -1,4 +1,4 @@
-# real-es
+# jest-manga-api
 
 **Backend Server for Scraping and Storing Manga**
 
@@ -17,7 +17,7 @@
 
 ## Overview
 
-`real-es` is a powerful backend server designed to **scrape manga data** from various sources and **store** it efficiently. The server exposes a flexible **API** that can be used by web applications and mobile apps to access manga content seamlessly.
+`jest-manga-api` is a powerful backend server designed to **scrape manga data** from various sources and **store** it efficiently. The server exposes a flexible **API** that can be used by web applications and mobile apps to access manga content seamlessly.
 
 ---
 
@@ -42,7 +42,7 @@
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/redaezziani/real-es.git
+   git clone https://github.com/redaezziani/jest-manga-api-.git
    cd real-es
    ```
 
